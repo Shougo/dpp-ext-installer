@@ -16,7 +16,7 @@ Compatibility		|dpp-ext-installer-compatibility|
 ==============================================================================
 INTRODUCTION                                  *dpp-ext-installer-introduction*
 
-This ext implements installer loading.
+This ext implements installer.
 
 
 ==============================================================================
