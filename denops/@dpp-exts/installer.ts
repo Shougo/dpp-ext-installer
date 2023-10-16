@@ -21,7 +21,12 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
-        const plugins = await detectPlugins(args);
+        const plugins = Object.values(
+          await vars.g.get(
+            args.denops,
+            "dpp#_plugins",
+          ),
+        ) as Plugin[];
 
         const bits = await Promise.all(
           plugins.map(async (plugin) =>
@@ -40,7 +45,14 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
-        await updatePlugins(args, await detectPlugins(args));
+        const plugins = Object.values(
+          await vars.g.get(
+            args.denops,
+            "dpp#_plugins",
+          ),
+        ) as Plugin[];
+
+        await updatePlugins(args, plugins);
       },
     },
   };
@@ -48,50 +60,6 @@ export class Ext extends BaseExt<Params> {
   override params(): Params {
     return {};
   }
-}
-
-async function detectPlugins(args: {
-  denops: Denops;
-  options: DppOptions;
-  protocols: Record<ProtocolName, Protocol>;
-  actionParams: unknown;
-}) {
-  const plugins = Object.values(
-    await vars.g.get(
-      args.denops,
-      "dpp#_plugins",
-    ),
-  ) as Plugin[];
-
-  // Detect protocol
-  for (const plugin of plugins) {
-    if ("protocol" in plugin) {
-      continue;
-    }
-
-    for (
-      const protocol of args.options.protocols.filter((protocolName) =>
-        args.protocols[protocolName]
-      ).map((protocolName) => args.protocols[protocolName])
-    ) {
-      const detect = await protocol.protocol.detect({
-        denops: args.denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-      });
-
-      if (detect) {
-        // Overwrite by detect()
-        Object.assign(plugin, {
-          ...detect,
-          protocol: protocol.protocol.name,
-        });
-      }
-    }
-  }
-
-  return plugins;
 }
 
 async function updatePlugins(args: {
