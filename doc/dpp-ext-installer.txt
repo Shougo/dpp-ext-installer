@@ -50,6 +50,8 @@ install
 		Install plugins.
 
 		params:
+			{names}:	Install plugin names.
+					(Default: [])
 
                                             *dpp-ext-installer-action-recache*
 recache
@@ -63,6 +65,8 @@ update
 		Update plugins.
 
 		params:
+			{names}:	Update plugin names.
+					(Default: [])
 
 ==============================================================================
 PARAMS                                              *dpp-ext-installer-params*

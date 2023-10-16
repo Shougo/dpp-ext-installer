@@ -11,6 +11,10 @@ import { isDirectory } from "https://deno.land/x/dpp_vim@v0.0.3/utils.ts";
 
 type Params = Record<string, never>;
 
+type InstallParams = {
+  names: string[];
+};
+
 export class Ext extends BaseExt<Params> {
   override actions: Actions<Params> = {
     install: {
@@ -21,12 +25,7 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
-        const plugins = Object.values(
-          await vars.g.get(
-            args.denops,
-            "dpp#_plugins",
-          ),
-        ) as Plugin[];
+        const plugins = await getPlugins(args.denops, args.actionParams);
 
         const bits = await Promise.all(
           plugins.map(async (plugin) =>
@@ -45,14 +44,10 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
-        const plugins = Object.values(
-          await vars.g.get(
-            args.denops,
-            "dpp#_plugins",
-          ),
-        ) as Plugin[];
-
-        await updatePlugins(args, plugins);
+        await updatePlugins(
+          args,
+          await getPlugins(args.denops, args.actionParams),
+        );
       },
     },
   };
@@ -68,6 +63,19 @@ async function updatePlugins(args: {
   protocols: Record<ProtocolName, Protocol>;
   actionParams: unknown;
 }, plugins: Plugin[]) {
+  if (plugins.length === 0) {
+    await args.denops.call(
+      "dpp#util#_error",
+      "Target plugins are not found.",
+    );
+    await args.denops.call(
+      "dpp#util#_error",
+      "You may have used the wrong plugin name," +
+        " or all of the plugins are already installed.",
+    );
+    return;
+  }
+
   // NOTE: Skip local plugins
   for (const plugin of plugins.filter((plugin) => !plugin.local)) {
     await args.denops.call(
@@ -125,4 +133,25 @@ async function updatePlugins(args: {
   await args.denops.call("dpp#ext#installer#_close_progress_window");
 
   await args.denops.call("dpp#clear_state");
+}
+
+async function getPlugins(
+  denops: Denops,
+  actionParams: unknown,
+): Promise<Plugin[]> {
+  const params = actionParams as InstallParams;
+  let plugins = Object.values(
+    await vars.g.get(
+      denops,
+      "dpp#_plugins",
+    ),
+  ) as Plugin[];
+
+  if (params.names.length > 0) {
+    plugins = plugins.filter((plugin) =>
+      params.names.indexOf(plugin.name) >= 0
+    );
+  }
+
+  return plugins;
 }
