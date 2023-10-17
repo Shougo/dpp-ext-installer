@@ -64,6 +64,14 @@ recache
 		|dpp-ext-installer-action-install| or
 		|dpp-ext-installer-action-update|.
 
+                                          *dpp-ext-installer-action-reinstall*
+reinstall
+		Reinstall plugins.
+
+		params:
+			{names}:	Reinstall plugin names.
+					(Required)
+
                                             *dpp-ext-installer-action-update*
 update
 		Update plugins.

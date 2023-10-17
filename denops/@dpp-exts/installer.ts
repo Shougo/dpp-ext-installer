@@ -25,7 +25,8 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
-        const plugins = await getPlugins(args.denops, args.actionParams);
+        const params = args.actionParams as InstallParams;
+        const plugins = await getPlugins(args.denops, params.names ?? []);
 
         const bits = await Promise.all(
           plugins.map(async (plugin) =>
@@ -44,10 +45,41 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
+        const params = args.actionParams as InstallParams;
         await updatePlugins(
           args,
-          await getPlugins(args.denops, args.actionParams),
+          await getPlugins(args.denops, params.names ?? []),
         );
+      },
+    },
+    reinstall: {
+      description: "Reinstall plugins",
+      callback: async (args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        actionParams: unknown;
+      }) => {
+        const params = args.actionParams as InstallParams;
+        if (!params.names || params.names.length === 0) {
+          // NOTE: names must be set.
+          await args.denops.call(
+            "dpp#util#_error",
+            "names must be set for reinstall plugins.",
+          );
+          return;
+        }
+
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+
+        for (const plugin of plugins) {
+          // Remove plugin directory
+          if (plugin.path && await isDirectory(plugin.path)) {
+            await Deno.remove(plugin.path, { recursive: true });
+          }
+        }
+
+        await updatePlugins(args, plugins);
       },
     },
   };
@@ -76,11 +108,11 @@ async function updatePlugins(args: {
     return;
   }
 
-  // NOTE: Skip local plugins
-  for (const plugin of plugins.filter((plugin) => !plugin.local)) {
+  let count = 1;
+  for (const plugin of plugins) {
     await args.denops.call(
       "dpp#ext#installer#_print_progress_message",
-      plugin.name,
+      `[${count}/${plugins.length}] ${plugin.name}`,
     );
 
     const protocol = args.protocols[plugin.protocol ?? ""];
@@ -128,6 +160,8 @@ async function updatePlugins(args: {
         );
       }
     }
+
+    count += 1;
   }
 
   await args.denops.call("dpp#ext#installer#_close_progress_window");
@@ -137,21 +171,20 @@ async function updatePlugins(args: {
 
 async function getPlugins(
   denops: Denops,
-  actionParams: unknown,
+  names: string[],
 ): Promise<Plugin[]> {
-  const params = actionParams as InstallParams;
-  let plugins = Object.values(
+  // NOTE: Skip local plugins
+  let plugins = (Object.values(
     await vars.g.get(
       denops,
       "dpp#_plugins",
     ),
-  ) as Plugin[];
+  ) as Plugin[]).filter((plugin) => !plugin.local);
 
-  if (params.names.length > 0) {
-    plugins = plugins.filter((plugin) =>
-      params.names.indexOf(plugin.name) >= 0
-    );
+  if (names.length > 0) {
+    plugins = plugins.filter((plugin) => names.indexOf(plugin.name) >= 0);
   }
 
   return plugins;
 }
+
