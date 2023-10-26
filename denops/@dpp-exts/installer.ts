@@ -142,6 +142,7 @@ async function updatePlugins(args: {
   }
 
   const updatedPlugins = [];
+  const erroredPlugins = [];
   const oldRevisions: Record<string, string> = {};
   let count = 1;
   for (const plugin of plugins) {
@@ -215,6 +216,8 @@ async function updatePlugins(args: {
         await buildPlugin(args.denops, plugin);
 
         updatedPlugins.push(plugin);
+      } else {
+        erroredPlugins.push(plugin);
       }
     }
 
@@ -265,6 +268,23 @@ async function updatePlugins(args: {
         newRev,
       );
     }
+  }
+
+  if (updatedPlugins.length > 0) {
+    await args.denops.call(
+      "dpp#ext#installer#_print_message",
+      "Updated plugins:\n" +
+        `${updatedPlugins.map((plugin) => plugin.name).join("\n")}`,
+    );
+  }
+
+  if (erroredPlugins.length > 0) {
+    await args.denops.call(
+      "dpp#ext#installer#_print_message",
+      "Error plugins:\n" +
+        `${erroredPlugins.map((plugin) => plugin.name).join("\n")}` +
+        "Please read the error message log with the :message command.\n",
+    );
   }
 
   await args.denops.call("dpp#ext#installer#_close_progress_window");

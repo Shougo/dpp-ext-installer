@@ -1,3 +1,12 @@
+function dpp#ext#installer#_print_message(msg) abort
+  for mes in s:msg2list(a:msg)
+    echomsg '[dpp] ' .. mes
+  endfor
+endfunction
+function s:msg2list(expr) abort
+  return a:expr->type() ==# v:t_list ? a:expr : a:expr->split('\n')
+endfunction
+
 function dpp#ext#installer#_print_progress_message(msg) abort
   if !exists('s:progress_winid') || s:progress_winid <= 0
     let s:progress_winid = s:new_progress_window()
