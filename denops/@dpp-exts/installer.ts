@@ -197,7 +197,7 @@ async function updatePlugins(args: {
         ) => line.length > 0)
       ) {
         await args.denops.call(
-          "dpp#ext#installer#_print_progress_message",
+          "dpp#util#_error",
           line,
         );
       }
@@ -328,7 +328,7 @@ async function buildPlugin(
     ) => line.length > 0)
   ) {
     await denops.call(
-      "dpp#ext#installer#_print_progress_message",
+      "dpp#util#_error",
       line,
     );
   }
@@ -372,7 +372,10 @@ async function checkDiff(
     }
 
     for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-      await outputCheckDiff(denops, line);
+      await denops.call(
+        "dpp#util#_error",
+        line,
+      );
     }
   }
 }
