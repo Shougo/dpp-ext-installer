@@ -6,13 +6,20 @@ import {
   Protocol,
   ProtocolName,
 } from "https://deno.land/x/dpp_vim@v0.0.6/types.ts";
-import { Denops, op, vars } from "https://deno.land/x/dpp_vim@v0.0.6/deps.ts";
+import {
+  Denops,
+  fn,
+  op,
+  vars,
+} from "https://deno.land/x/dpp_vim@v0.0.6/deps.ts";
 import {
   convert2List,
   isDirectory,
 } from "https://deno.land/x/dpp_vim@v0.0.6/utils.ts";
 
-type Params = Record<string, never>;
+type Params = {
+  checkDiff: boolean;
+};
 
 type InstallParams = {
   names: string[];
@@ -43,6 +50,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
         actionParams: unknown;
       }) => {
         const params = args.actionParams as InstallParams;
@@ -63,6 +71,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
         actionParams: unknown;
       }) => {
         const params = args.actionParams as InstallParams;
@@ -78,6 +87,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
         actionParams: unknown;
       }) => {
         const params = args.actionParams as InstallParams;
@@ -105,7 +115,9 @@ export class Ext extends BaseExt<Params> {
   };
 
   override params(): Params {
-    return {};
+    return {
+      checkDiff: false,
+    };
   }
 }
 
@@ -113,6 +125,7 @@ async function updatePlugins(args: {
   denops: Denops;
   options: DppOptions;
   protocols: Record<ProtocolName, Protocol>;
+  extParams: Params;
   actionParams: unknown;
 }, plugins: Plugin[]) {
   if (plugins.length === 0) {
@@ -129,6 +142,7 @@ async function updatePlugins(args: {
   }
 
   const updatedPlugins = [];
+  const oldRevisions: Record<string, string> = {};
   let count = 1;
   for (const plugin of plugins) {
     await args.denops.call(
@@ -137,6 +151,13 @@ async function updatePlugins(args: {
     );
 
     const protocol = args.protocols[plugin.protocol ?? ""];
+
+    oldRevisions[plugin.name] = await protocol.protocol.getRevision({
+      denops: args.denops,
+      plugin,
+      protocolOptions: protocol.options,
+      protocolParams: protocol.params,
+    });
 
     const commands = await protocol.protocol.getSyncCommands({
       denops: args.denops,
@@ -187,7 +208,7 @@ async function updatePlugins(args: {
           await args.denops.call(
             "dpp#ext#installer#_call_hook",
             "post_update",
-            plugin.name,
+            plugin,
           );
         }
 
@@ -206,7 +227,7 @@ async function updatePlugins(args: {
       await args.denops.call(
         "dpp#ext#installer#_call_hook",
         "done_update",
-        plugin.name,
+        plugin,
       );
     }
 
@@ -222,9 +243,27 @@ async function updatePlugins(args: {
         await args.denops.call(
           "dpp#ext#installer#_call_hook",
           "depends_update",
-          depend.name,
+          depend,
         );
       }
+    }
+
+    if (args.extParams.checkDiff) {
+      const protocol = args.protocols[plugin.protocol ?? ""];
+      const newRev = await protocol.protocol.getRevision({
+        denops: args.denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+      });
+
+      await checkDiff(
+        args.denops,
+        plugin,
+        args.protocols[plugin.protocol ?? ""],
+        oldRevisions[plugin.name],
+        newRev,
+      );
     }
   }
 
@@ -293,4 +332,69 @@ async function buildPlugin(
       line,
     );
   }
+}
+
+async function checkDiff(
+  denops: Denops,
+  plugin: Plugin,
+  protocol: Protocol,
+  newRev: string,
+  oldRev: string,
+) {
+  if (newRev === oldRev || newRev.length === 0 || oldRev.length === 0) {
+    return;
+  }
+
+  const commands = await protocol.protocol.getDiffCommands({
+    denops: denops,
+    plugin,
+    protocolOptions: protocol.options,
+    protocolParams: protocol.params,
+    newRev,
+    oldRev,
+  });
+
+  for (const command of commands) {
+    const proc = new Deno.Command(
+      command.command,
+      {
+        args: command.args,
+        cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+        stdout: "piped",
+        stderr: "piped",
+      },
+    );
+
+    const { stdout, stderr } = await proc.output();
+
+    for (const line of new TextDecoder().decode(stdout).split(/\r?\n/)) {
+      await outputCheckDiff(denops, line);
+    }
+
+    for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
+      await outputCheckDiff(denops, line);
+    }
+  }
+}
+
+async function outputCheckDiff(denops: Denops, line: string) {
+  if (line.length === 0) {
+    return;
+  }
+
+  const bufname = "dein-diff";
+  const bufnr = await fn.bufexists(denops, bufname)
+    ? await fn.bufnr(denops, bufname)
+    : await fn.bufadd(denops, bufname);
+
+  if (await fn.bufwinnr(denops, bufnr) < 0) {
+    const cmd = await fn.escape(
+      denops,
+      "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable",
+      " "
+    );
+    await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
+  }
+
+  await fn.appendbufline(denops, bufnr, "$", line);
 }

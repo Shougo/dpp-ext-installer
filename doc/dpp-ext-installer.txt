@@ -91,6 +91,13 @@ update
 ==============================================================================
 PARAMS                                              *dpp-ext-installer-params*
 
+                                           *dpp-ext-installer-param-checkDiff*
+checkDiff
+		It checks plugins documentation diff when updated plugins.
+		NOTE: It outputs the diff to new buffer in the background.
+
+		Defaults: v:false
+
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
 
