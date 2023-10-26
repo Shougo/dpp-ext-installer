@@ -56,3 +56,30 @@ function s:new_progress_window() abort
 
   return winid
 endfunction
+
+function dpp#ext#installer#_call_hook(hook_name, plugin) abort
+  call dpp#source(a:plugin.name)
+
+  const cwd = getcwd()
+  try
+    call s:cd(a:plugin.path)
+    call dpp#util#_call_hook(a:hook_name, a:plugin.name)
+  finally
+    call s:cd(cwd)
+  endtry
+endfunction
+
+function! s:cd(path) abort
+  if !(a:path->isdirectory())
+    return
+  endif
+
+  try
+    noautocmd execute (haslocaldir() ? 'lcd' : 'cd') a:path->fnameescape()
+  catch
+    call dpp#util#_error('Error cd to: ' .. a:path)
+    call dpp#util#_error('Current directory: ' .. getcwd())
+    call dpp#util#_error(v:exception)
+    call dpp#util#_error(v:throwpoint)
+  endtry
+endfunction

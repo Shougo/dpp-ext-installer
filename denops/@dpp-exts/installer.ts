@@ -5,9 +5,12 @@ import {
   Plugin,
   Protocol,
   ProtocolName,
-} from "https://deno.land/x/dpp_vim@v0.0.3/types.ts";
-import { Denops, op, vars } from "https://deno.land/x/dpp_vim@v0.0.3/deps.ts";
-import { isDirectory } from "https://deno.land/x/dpp_vim@v0.0.3/utils.ts";
+} from "https://deno.land/x/dpp_vim@v0.0.6/types.ts";
+import { Denops, op, vars } from "https://deno.land/x/dpp_vim@v0.0.6/deps.ts";
+import {
+  convert2List,
+  isDirectory,
+} from "https://deno.land/x/dpp_vim@v0.0.6/utils.ts";
 
 type Params = Record<string, never>;
 
@@ -125,6 +128,7 @@ async function updatePlugins(args: {
     return;
   }
 
+  const updatedPlugins = [];
   let count = 1;
   for (const plugin of plugins) {
     await args.denops.call(
@@ -178,11 +182,50 @@ async function updatePlugins(args: {
       }
 
       if (success) {
+        // Execute "post_update" before "build"
+        if (plugin.hook_post_update) {
+          await args.denops.call(
+            "dpp#ext#installer#_call_hook",
+            "post_update",
+            plugin.name,
+          );
+        }
+
         await buildPlugin(args.denops, plugin);
+
+        updatedPlugins.push(plugin);
       }
     }
 
     count += 1;
+  }
+
+  const calledDepends: Record<string, boolean> = {};
+  for (const plugin of updatedPlugins) {
+    if (plugin.hook_done_update) {
+      await args.denops.call(
+        "dpp#ext#installer#_call_hook",
+        "done_update",
+        plugin.name,
+      );
+    }
+
+    for (
+      const depend of await getPlugins(
+        args.denops,
+        convert2List(plugin.depends),
+      )
+    ) {
+      if (depend.hook_depends_update && !calledDepends[depend.name]) {
+        calledDepends[depend.name] = true;
+
+        await args.denops.call(
+          "dpp#ext#installer#_call_hook",
+          "depends_update",
+          depend.name,
+        );
+      }
+    }
   }
 
   await args.denops.call("dpp#ext#installer#_close_progress_window");
