@@ -6,7 +6,7 @@ import {
   Protocol,
   ProtocolName,
 } from "https://deno.land/x/dpp_vim@v0.0.3/types.ts";
-import { Denops, vars } from "https://deno.land/x/dpp_vim@v0.0.3/deps.ts";
+import { Denops, op, vars } from "https://deno.land/x/dpp_vim@v0.0.3/deps.ts";
 import { isDirectory } from "https://deno.land/x/dpp_vim@v0.0.3/utils.ts";
 
 type Params = Record<string, never>;
@@ -17,6 +17,23 @@ type InstallParams = {
 
 export class Ext extends BaseExt<Params> {
   override actions: Actions<Params> = {
+    build: {
+      description: "Build plugins",
+      callback: async (args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        actionParams: unknown;
+      }) => {
+        const params = args.actionParams as InstallParams;
+
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+
+        for (const plugin of plugins) {
+          await buildPlugin(args.denops, plugin);
+        }
+      },
+    },
     install: {
       description: "Install plugins",
       callback: async (args: {
@@ -136,7 +153,7 @@ async function updatePlugins(args: {
         },
       );
 
-      const { stdout, stderr } = await proc.output();
+      const { stdout, stderr, success } = await proc.output();
 
       for (
         const line of new TextDecoder().decode(stdout).split(/\r?\n/).filter((
@@ -158,6 +175,10 @@ async function updatePlugins(args: {
           "dpp#ext#installer#_print_progress_message",
           line,
         );
+      }
+
+      if (success) {
+        await buildPlugin(args.denops, plugin);
       }
     }
 
@@ -188,3 +209,45 @@ async function getPlugins(
   return plugins;
 }
 
+async function buildPlugin(
+  denops: Denops,
+  plugin: Plugin,
+) {
+  if (!plugin.path || !await isDirectory(plugin.path) || !plugin.build) {
+    return;
+  }
+
+  const proc = new Deno.Command(
+    await op.shell.getGlobal(denops),
+    {
+      args: [await op.shellcmdflag.getGlobal(denops), plugin.build],
+      cwd: plugin.path,
+      stdout: "piped",
+      stderr: "piped",
+    },
+  );
+
+  const { stdout, stderr } = await proc.output();
+
+  for (
+    const line of new TextDecoder().decode(stdout).split(/\r?\n/).filter((
+      line,
+    ) => line.length > 0)
+  ) {
+    await denops.call(
+      "dpp#ext#installer#_print_progress_message",
+      line,
+    );
+  }
+
+  for (
+    const line of new TextDecoder().decode(stderr).split(/\r?\n/).filter((
+      line,
+    ) => line.length > 0)
+  ) {
+    await denops.call(
+      "dpp#ext#installer#_print_progress_message",
+      line,
+    );
+  }
+}
