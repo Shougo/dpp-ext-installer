@@ -5,17 +5,17 @@ import {
   Plugin,
   Protocol,
   ProtocolName,
-} from "https://deno.land/x/dpp_vim@v0.0.6/types.ts";
+} from "https://deno.land/x/dpp_vim@v0.0.7/types.ts";
 import {
   Denops,
   fn,
   op,
   vars,
-} from "https://deno.land/x/dpp_vim@v0.0.6/deps.ts";
+} from "https://deno.land/x/dpp_vim@v0.0.7/deps.ts";
 import {
   convert2List,
   isDirectory,
-} from "https://deno.land/x/dpp_vim@v0.0.6/utils.ts";
+} from "https://deno.land/x/dpp_vim@v0.0.7/utils.ts";
 
 type Params = {
   checkDiff: boolean;
@@ -23,6 +23,14 @@ type Params = {
 
 type InstallParams = {
   names: string[];
+};
+
+type UpdatedPlugin = {
+  logMessage: string;
+  newRev: string;
+  oldRev: string;
+  plugin: Plugin;
+  protocol: Protocol;
 };
 
 export class Ext extends BaseExt<Params> {
@@ -141,9 +149,8 @@ async function updatePlugins(args: {
     return;
   }
 
-  const updatedPlugins = [];
+  const updatedPlugins: UpdatedPlugin[] = [];
   const erroredPlugins = [];
-  const oldRevisions: Record<string, string> = {};
   let count = 1;
   for (const plugin of plugins) {
     await args.denops.call(
@@ -153,7 +160,7 @@ async function updatePlugins(args: {
 
     const protocol = args.protocols[plugin.protocol ?? ""];
 
-    oldRevisions[plugin.name] = await protocol.protocol.getRevision({
+    const oldRev = await protocol.protocol.getRevision({
       denops: args.denops,
       plugin,
       protocolOptions: protocol.options,
@@ -215,7 +222,28 @@ async function updatePlugins(args: {
 
         await buildPlugin(args.denops, plugin);
 
-        updatedPlugins.push(plugin);
+        const newRev = await protocol.protocol.getRevision({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+        });
+
+        const logMessage = await getLogMessage(
+          args.denops,
+          plugin,
+          protocol,
+          newRev,
+          oldRev,
+        );
+
+        updatedPlugins.push({
+          logMessage,
+          oldRev,
+          newRev,
+          plugin,
+          protocol,
+        });
       } else {
         erroredPlugins.push(plugin);
       }
@@ -225,19 +253,19 @@ async function updatePlugins(args: {
   }
 
   const calledDepends: Record<string, boolean> = {};
-  for (const plugin of updatedPlugins) {
-    if (plugin.hook_done_update) {
+  for (const updated of updatedPlugins) {
+    if (updated.plugin.hook_done_update) {
       await args.denops.call(
         "dpp#ext#installer#_call_hook",
         "done_update",
-        plugin,
+        updated.plugin,
       );
     }
 
     for (
       const depend of await getPlugins(
         args.denops,
-        convert2List(plugin.depends),
+        convert2List(updated.plugin.depends),
       )
     ) {
       if (depend.hook_depends_update && !calledDepends[depend.name]) {
@@ -252,20 +280,12 @@ async function updatePlugins(args: {
     }
 
     if (args.extParams.checkDiff) {
-      const protocol = args.protocols[plugin.protocol ?? ""];
-      const newRev = await protocol.protocol.getRevision({
-        denops: args.denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-      });
-
       await checkDiff(
         args.denops,
-        plugin,
-        args.protocols[plugin.protocol ?? ""],
-        oldRevisions[plugin.name],
-        newRev,
+        updated.plugin,
+        updated.protocol,
+        updated.oldRev,
+        updated.newRev,
       );
     }
   }
@@ -274,8 +294,22 @@ async function updatePlugins(args: {
     await args.denops.call(
       "dpp#ext#installer#_print_message",
       "Updated plugins:\n" +
-        `${updatedPlugins.map((plugin) => plugin.name).join("\n")}`,
+        `${updatedPlugins.map((updated) => updated.plugin.name).join("\n")}`,
     );
+
+    // If it has breaking changes commit message
+    // https://www.conventionalcommits.org/en/v1.0.0/
+    const breakingPlugins = updatedPlugins.filter((updated) =>
+      updated.logMessage.match(/.*!.*:|BREAKING CHANGE:/)
+    );
+
+    if (breakingPlugins.length > 0) {
+      await args.denops.call(
+        "dpp#ext#installer#_print_message",
+        "Breaking updated plugins:\n" +
+          `${breakingPlugins.map((updated) => updated.plugin.name).join("\n")}`,
+      );
+    }
   }
 
   if (erroredPlugins.length > 0) {
@@ -354,6 +388,52 @@ async function buildPlugin(
   }
 }
 
+async function getLogMessage(
+  denops: Denops,
+  plugin: Plugin,
+  protocol: Protocol,
+  newRev: string,
+  oldRev: string,
+): Promise<string> {
+  if (newRev === oldRev || newRev.length === 0 || oldRev.length === 0) {
+    return "";
+  }
+
+  const commands = await protocol.protocol.getLogCommands({
+    denops: denops,
+    plugin,
+    protocolOptions: protocol.options,
+    protocolParams: protocol.params,
+    newRev,
+    oldRev,
+  });
+
+  let logMessage = "";
+  for (const command of commands) {
+    const proc = new Deno.Command(
+      command.command,
+      {
+        args: command.args,
+        cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+        stdout: "piped",
+        stderr: "piped",
+      },
+    );
+
+    const { stdout, stderr } = await proc.output();
+
+    logMessage += new TextDecoder().decode(stdout);
+
+    for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
+      await denops.call(
+        "dpp#util#_error",
+        line,
+      );
+    }
+  }
+
+  return logMessage;
+}
 async function checkDiff(
   denops: Denops,
   plugin: Plugin,
@@ -414,7 +494,7 @@ async function outputCheckDiff(denops: Denops, line: string) {
     const cmd = await fn.escape(
       denops,
       "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable",
-      " "
+      " ",
     );
     await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
   }
