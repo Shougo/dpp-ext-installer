@@ -151,6 +151,7 @@ async function updatePlugins(args: {
 
   const updatedPlugins: UpdatedPlugin[] = [];
   const erroredPlugins = [];
+  let updateSuccess = true;
   let count = 1;
   for (const plugin of plugins) {
     await args.denops.call(
@@ -210,43 +211,48 @@ async function updatePlugins(args: {
         );
       }
 
-      if (success) {
-        // Execute "post_update" before "build"
-        if (plugin.hook_post_update) {
-          await args.denops.call(
-            "dpp#ext#installer#_call_hook",
-            "post_update",
-            plugin,
-          );
-        }
-
-        await buildPlugin(args.denops, plugin);
-
-        const newRev = await protocol.protocol.getRevision({
-          denops: args.denops,
-          plugin,
-          protocolOptions: protocol.options,
-          protocolParams: protocol.params,
-        });
-
-        const logMessage = await getLogMessage(
-          args.denops,
-          plugin,
-          protocol,
-          newRev,
-          oldRev,
-        );
-
-        updatedPlugins.push({
-          logMessage,
-          oldRev,
-          newRev,
-          plugin,
-          protocol,
-        });
-      } else {
-        erroredPlugins.push(plugin);
+      if (!success) {
+        updateSuccess = false;
+        break;
       }
+    }
+
+    if (updateSuccess) {
+      // Execute "post_update" before "build"
+      if (plugin.hook_post_update) {
+        await args.denops.call(
+          "dpp#ext#installer#_call_hook",
+          "post_update",
+          plugin,
+        );
+      }
+
+      await buildPlugin(args.denops, plugin);
+
+      const newRev = await protocol.protocol.getRevision({
+        denops: args.denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+      });
+
+      const logMessage = await getLogMessage(
+        args.denops,
+        plugin,
+        protocol,
+        newRev,
+        oldRev,
+      );
+
+      updatedPlugins.push({
+        logMessage,
+        oldRev,
+        newRev,
+        plugin,
+        protocol,
+      });
+    } else {
+      erroredPlugins.push(plugin);
     }
 
     count += 1;
