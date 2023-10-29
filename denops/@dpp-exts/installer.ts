@@ -244,13 +244,15 @@ async function updatePlugins(args: {
         oldRev,
       );
 
-      updatedPlugins.push({
-        logMessage,
-        oldRev,
-        newRev,
-        plugin,
-        protocol,
-      });
+      if (oldRev.length === 0 || oldRev !== newRev) {
+        updatedPlugins.push({
+          logMessage,
+          oldRev,
+          newRev,
+          plugin,
+          protocol,
+        });
+      }
     } else {
       erroredPlugins.push(plugin);
     }
