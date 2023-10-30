@@ -19,6 +19,7 @@ import {
 
 type Params = {
   checkDiff: boolean;
+  maxProcesses: number;
 };
 
 type InstallParams = {
@@ -125,6 +126,7 @@ export class Ext extends BaseExt<Params> {
   override params(): Params {
     return {
       checkDiff: false,
+      maxProcesses: 5,
     };
   }
 }
@@ -150,114 +152,125 @@ async function updatePlugins(args: {
   }
 
   const updatedPlugins: UpdatedPlugin[] = [];
-  const erroredPlugins = [];
-  let updateSuccess = true;
+  const erroredPlugins: Plugin[] = [];
+  const maxLength = plugins.length;
   let count = 1;
-  for (const plugin of plugins) {
-    await args.denops.call(
-      "dpp#ext#installer#_print_progress_message",
-      `[${count}/${plugins.length}] ${plugin.name}`,
+  while (plugins.length > 0) {
+    await Promise.all(
+      plugins.splice(0, args.extParams.maxProcesses).map(
+        async (plugin: Plugin, index: number): Promise<void> => {
+          await args.denops.call(
+            "dpp#ext#installer#_print_progress_message",
+            `[${count + index}/${maxLength}] ${plugin.name}`,
+          );
+
+          const protocol = args.protocols[plugin.protocol ?? ""];
+
+          const oldRev = await protocol.protocol.getRevision({
+            denops: args.denops,
+            plugin,
+            protocolOptions: protocol.options,
+            protocolParams: protocol.params,
+          });
+
+          const commands = await protocol.protocol.getSyncCommands({
+            denops: args.denops,
+            plugin,
+            protocolOptions: protocol.options,
+            protocolParams: protocol.params,
+          });
+
+          // Execute commands
+          let updateSuccess = true;
+          for (const command of commands) {
+            const proc = new Deno.Command(
+              command.command,
+              {
+                args: command.args,
+                cwd: await isDirectory(plugin.path ?? "")
+                  ? plugin.path
+                  : Deno.cwd(),
+                stdout: "piped",
+                stderr: "piped",
+              },
+            );
+
+            const { stdout, stderr, success } = await proc.output();
+
+            for (
+              const line of new TextDecoder().decode(stdout).split(/\r?\n/)
+                .filter((
+                  line,
+                ) => line.length > 0)
+            ) {
+              await args.denops.call(
+                "dpp#ext#installer#_print_progress_message",
+                line,
+              );
+            }
+
+            for (
+              const line of new TextDecoder().decode(stderr).split(/\r?\n/)
+                .filter((
+                  line,
+                ) => line.length > 0)
+            ) {
+              await args.denops.call(
+                "dpp#util#_error",
+                line,
+              );
+            }
+
+            if (!success) {
+              updateSuccess = false;
+              break;
+            }
+          }
+
+          if (updateSuccess) {
+            // Execute "post_update" before "build"
+            if (plugin.hook_post_update) {
+              await args.denops.call(
+                "dpp#ext#installer#_call_hook",
+                "post_update",
+                plugin,
+              );
+            }
+
+            await buildPlugin(args.denops, plugin);
+
+            const newRev = await protocol.protocol.getRevision({
+              denops: args.denops,
+              plugin,
+              protocolOptions: protocol.options,
+              protocolParams: protocol.params,
+            });
+
+            const logMessage = await getLogMessage(
+              args.denops,
+              plugin,
+              protocol,
+              newRev,
+              oldRev,
+            );
+
+            if (oldRev.length === 0 || oldRev !== newRev) {
+              updatedPlugins.push({
+                logMessage,
+                oldRev,
+                newRev,
+                plugin,
+                protocol,
+              });
+            }
+          } else {
+            erroredPlugins.push(plugin);
+          }
+        },
+      ),
     );
 
-    const protocol = args.protocols[plugin.protocol ?? ""];
-
-    const oldRev = await protocol.protocol.getRevision({
-      denops: args.denops,
-      plugin,
-      protocolOptions: protocol.options,
-      protocolParams: protocol.params,
-    });
-
-    const commands = await protocol.protocol.getSyncCommands({
-      denops: args.denops,
-      plugin,
-      protocolOptions: protocol.options,
-      protocolParams: protocol.params,
-    });
-
-    // Execute commands
-    for (const command of commands) {
-      const proc = new Deno.Command(
-        command.command,
-        {
-          args: command.args,
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
-          stdout: "piped",
-          stderr: "piped",
-        },
-      );
-
-      const { stdout, stderr, success } = await proc.output();
-
-      for (
-        const line of new TextDecoder().decode(stdout).split(/\r?\n/).filter((
-          line,
-        ) => line.length > 0)
-      ) {
-        await args.denops.call(
-          "dpp#ext#installer#_print_progress_message",
-          line,
-        );
-      }
-
-      for (
-        const line of new TextDecoder().decode(stderr).split(/\r?\n/).filter((
-          line,
-        ) => line.length > 0)
-      ) {
-        await args.denops.call(
-          "dpp#util#_error",
-          line,
-        );
-      }
-
-      if (!success) {
-        updateSuccess = false;
-        break;
-      }
-    }
-
-    if (updateSuccess) {
-      // Execute "post_update" before "build"
-      if (plugin.hook_post_update) {
-        await args.denops.call(
-          "dpp#ext#installer#_call_hook",
-          "post_update",
-          plugin,
-        );
-      }
-
-      await buildPlugin(args.denops, plugin);
-
-      const newRev = await protocol.protocol.getRevision({
-        denops: args.denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-      });
-
-      const logMessage = await getLogMessage(
-        args.denops,
-        plugin,
-        protocol,
-        newRev,
-        oldRev,
-      );
-
-      if (oldRev.length === 0 || oldRev !== newRev) {
-        updatedPlugins.push({
-          logMessage,
-          oldRev,
-          newRev,
-          plugin,
-          protocol,
-        });
-      }
-    } else {
-      erroredPlugins.push(plugin);
-    }
-
-    count += 1;
+    count += args.extParams.maxProcesses;
   }
 
   const calledDepends: Record<string, boolean> = {};
