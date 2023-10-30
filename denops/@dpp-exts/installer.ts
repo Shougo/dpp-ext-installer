@@ -153,29 +153,19 @@ async function updatePlugins(args: {
 
   const updatedPlugins: UpdatedPlugin[] = [];
   const erroredPlugins: Plugin[] = [];
-  const maxLength = plugins.length;
-  let count = 1;
-  // NOTE: Use Array.prototype.splice() to limit Promise.all() concurrency.
-  // It changes "plugins" Array though.
-  while (plugins.length > 0) {
-    await Promise.all(
-      plugins.splice(0, args.extParams.maxProcesses).map(
-        async (plugin: Plugin, index: number): Promise<void> => {
-          return await updatePlugin(
-            args,
-            updatedPlugins,
-            erroredPlugins,
-            maxLength,
-            count,
-            plugin,
-            index,
-          );
-        },
-      ),
-    );
-
-    count += args.extParams.maxProcesses;
-  }
+  await limitPromiseConcurrency(
+    plugins.map((plugin: Plugin, index: number) => async () => {
+      return await updatePlugin(
+        args,
+        updatedPlugins,
+        erroredPlugins,
+        plugins.length,
+        plugin,
+        index + 1,
+      );
+    }),
+    Math.max(args.extParams.maxProcesses, 1),
+  );
 
   const calledDepends: Record<string, boolean> = {};
   for (const updated of updatedPlugins) {
@@ -262,13 +252,12 @@ async function updatePlugin(
   updatedPlugins: UpdatedPlugin[],
   erroredPlugins: Plugin[],
   maxLength: number,
-  count: number,
   plugin: Plugin,
   index: number,
 ) {
   await args.denops.call(
     "dpp#ext#installer#_print_progress_message",
-    `[${count + index}/${maxLength}] ${plugin.name}`,
+    `[${index}/${maxLength}] ${plugin.name}`,
   );
 
   const protocol = args.protocols[plugin.protocol ?? ""];
@@ -543,4 +532,24 @@ async function outputCheckDiff(denops: Denops, line: string) {
   }
 
   await fn.appendbufline(denops, bufnr, "$", line);
+}
+
+async function limitPromiseConcurrency<T>(
+  funcs: Array<() => Promise<T>>,
+  limit: number,
+): Promise<T[]> {
+  const results: T[] = [];
+  let i = 0;
+
+  const execFunc = async (): Promise<void> => {
+    if (i === funcs.length) return;
+    const func = funcs[i++];
+    results.push(await func());
+    return execFunc();
+  };
+
+  const initialFuncs = funcs.slice(0, limit).map(() => execFunc());
+  await Promise.all(initialFuncs);
+
+  return results;
 }
