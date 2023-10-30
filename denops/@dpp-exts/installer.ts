@@ -155,6 +155,8 @@ async function updatePlugins(args: {
   const erroredPlugins: Plugin[] = [];
   const maxLength = plugins.length;
   let count = 1;
+  // NOTE: Use Array.prototype.splice() to limit Promise.all() concurrency.
+  // It changes "plugins" Array though.
   while (plugins.length > 0) {
     await Promise.all(
       plugins.splice(0, args.extParams.maxProcesses).map(
