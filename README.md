@@ -21,3 +21,7 @@ https://github.com/Shougo/dpp.vim
 	" Update plugins
 	call dpp#async_ext_action('installer', 'update')
 ```
+
+## Screenshots
+
+![install UI](install_ui.png)
