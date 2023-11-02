@@ -98,6 +98,14 @@ checkDiff
 
 		Defaults: v:false
 
+                                             *dpp-ext-installer-param-getLogs*
+getLogs
+		Get all previous logs.
+
+                                       *dpp-ext-installer-param-getUpdateLogs*
+getUpdateLogs
+		Get all previous update logs.
+
                                         *dpp-ext-installer-param-maxProcesses*
 maxProcesses
 		The max number of processes used for update.
