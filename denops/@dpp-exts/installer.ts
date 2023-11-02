@@ -56,7 +56,7 @@ export class Ext extends BaseExt<Params> {
         }
       },
     },
-    getLog: {
+    getLogs: {
       description: "Get logs",
       callback: (_args: {
         denops: Denops;
@@ -67,7 +67,7 @@ export class Ext extends BaseExt<Params> {
         return this.logs;
       },
     },
-    getUpdatesLog: {
+    getUpdateLogs: {
       description: "Get update logs",
       callback: (_args: {
         denops: Denops;
