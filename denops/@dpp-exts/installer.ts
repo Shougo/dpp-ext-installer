@@ -242,17 +242,20 @@ export class Ext extends BaseExt<Params> {
       // If it has breaking changes commit message
       // https://www.conventionalcommits.org/en/v1.0.0/
       const breakingPlugins = updatedPlugins.filter(
-        (updated) =>
-        updated.logMessage.match(/.*!.*:|BREAKING CHANGE:/)
+        (updated) => updated.logMessage.match(/.*!.*:|BREAKING CHANGE:/),
       );
 
       if (breakingPlugins.length > 0) {
         await this.printMessage(
           args.denops,
           "Breaking updated plugins:\n" +
-            `${breakingPlugins.map((updated) => updated.plugin.name).join("\n")}`,
+            `${
+              breakingPlugins.map((updated) => updated.plugin.name).join("\n")
+            }`,
         );
       }
+
+      await saveRollbackFile(args.denops, args.protocols);
     }
 
     if (erroredPlugins.length > 0) {
@@ -321,14 +324,14 @@ export class Ext extends BaseExt<Params> {
 
       for (
         const line of new TextDecoder().decode(stdout).split(/\r?\n/)
-      .filter((line) => line.length > 0)
+          .filter((line) => line.length > 0)
       ) {
         await this.printProgress(args.denops, line);
       }
 
       for (
         const line of new TextDecoder().decode(stderr).split(/\r?\n/)
-      .filter((line) => line.length > 0)
+          .filter((line) => line.length > 0)
       ) {
         await this.printError(args.denops, line);
       }
@@ -522,7 +525,6 @@ export class Ext extends BaseExt<Params> {
   }
 }
 
-
 async function getPlugins(
   denops: Denops,
   names: string[],
@@ -541,7 +543,6 @@ async function getPlugins(
 
   return plugins;
 }
-
 
 async function outputCheckDiff(denops: Denops, line: string) {
   if (line.length === 0) {
@@ -563,6 +564,42 @@ async function outputCheckDiff(denops: Denops, line: string) {
   }
 
   await fn.appendbufline(denops, bufnr, "$", line);
+}
+
+async function saveRollbackFile(
+  denops: Denops,
+  protocols: Record<ProtocolName, Protocol>,
+) {
+  // Get revisions
+  const revisions: Record<string, string> = {};
+  for (const plugin of await getPlugins(denops, [])) {
+    const protocol = protocols[plugin.protocol ?? ""];
+    revisions[plugin.name] = await protocol.protocol.getRevision({
+      denops: denops,
+      plugin,
+      protocolOptions: protocol.options,
+      protocolParams: protocol.params,
+    });
+  }
+
+  const getFormattedDate = (date: Date): string => {
+    const year = date.getFullYear().toString().slice(-2);
+    const month = ("0" + (date.getMonth() + 1)).slice(-2);
+    const day = ("0" + date.getDate()).slice(-2);
+    const hours = ("0" + date.getHours()).slice(-2);
+    const minutes = ("0" + date.getMinutes()).slice(-2);
+    const seconds = ("0" + date.getSeconds()).slice(-2);
+
+    return year + month + day + hours + minutes + seconds;
+  };
+
+  // Save rollback file
+  const basePath = await vars.g.get(denops, "dpp#_base_path");
+  const name = await vars.g.get(denops, "dpp#_name");
+  const rollbackDir = `${basePath}/${name}/${getFormattedDate(new Date())}`;
+  await Deno.mkdir(rollbackDir, { recursive: true });
+  const rollbackFile = `${rollbackDir}/rollback.json`;
+  await Deno.writeTextFile(rollbackFile, JSON.stringify(revisions));
 }
 
 async function limitPromiseConcurrency<T>(
