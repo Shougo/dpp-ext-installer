@@ -15,6 +15,7 @@ import {
 import {
   convert2List,
   isDirectory,
+  safeStat,
 } from "https://deno.land/x/dpp_vim@v0.0.7/utils.ts";
 
 type Params = {
@@ -24,6 +25,7 @@ type Params = {
 
 type InstallParams = {
   names: string[];
+  rollback: string;
 };
 
 type UpdatedPlugin = {
@@ -90,13 +92,21 @@ export class Ext extends BaseExt<Params> {
         const params = args.actionParams as InstallParams;
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
+        const revisions = params.rollback
+          ? await loadRollbackFile(args.denops, params.rollback)
+          : {};
+
         const bits = await Promise.all(
           plugins.map(async (plugin) =>
             plugin.path && !await isDirectory(plugin.path)
           ),
         );
 
-        await this.updatePlugins(args, plugins.filter((_) => bits.shift()));
+        await this.updatePlugins(
+          args,
+          plugins.filter((_) => bits.shift()),
+          revisions,
+        );
       },
     },
     update: {
@@ -109,10 +119,13 @@ export class Ext extends BaseExt<Params> {
         actionParams: unknown;
       }) => {
         const params = args.actionParams as InstallParams;
-        await this.updatePlugins(
-          args,
-          await getPlugins(args.denops, params.names ?? []),
-        );
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+
+        const revisions = params.rollback
+          ? await loadRollbackFile(args.denops, params.rollback)
+          : {};
+
+        await this.updatePlugins(args, plugins, revisions);
       },
     },
     reinstall: {
@@ -136,6 +149,10 @@ export class Ext extends BaseExt<Params> {
 
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
+        const revisions = params.rollback
+          ? await loadRollbackFile(args.denops, params.rollback)
+          : {};
+
         for (const plugin of plugins) {
           // Remove plugin directory
           if (plugin.path && await isDirectory(plugin.path)) {
@@ -143,7 +160,7 @@ export class Ext extends BaseExt<Params> {
           }
         }
 
-        await this.updatePlugins(args, plugins);
+        await this.updatePlugins(args, plugins, revisions);
       },
     },
   };
@@ -155,13 +172,17 @@ export class Ext extends BaseExt<Params> {
     };
   }
 
-  private async updatePlugins(args: {
-    denops: Denops;
-    options: DppOptions;
-    protocols: Record<ProtocolName, Protocol>;
-    extParams: Params;
-    actionParams: unknown;
-  }, plugins: Plugin[]) {
+  private async updatePlugins(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      protocols: Record<ProtocolName, Protocol>;
+      extParams: Params;
+      actionParams: unknown;
+    },
+    plugins: Plugin[],
+    revisions: Record<string, string>,
+  ) {
     this.logs = [];
     this.updateLogs = [];
 
@@ -186,6 +207,7 @@ export class Ext extends BaseExt<Params> {
           args,
           updatedPlugins,
           erroredPlugins,
+          revisions,
           plugins.length,
           plugin,
           index + 1,
@@ -282,6 +304,7 @@ export class Ext extends BaseExt<Params> {
     },
     updatedPlugins: UpdatedPlugin[],
     erroredPlugins: Plugin[],
+    revisions: Record<string, string>,
     maxLength: number,
     plugin: Plugin,
     index: number,
@@ -300,12 +323,25 @@ export class Ext extends BaseExt<Params> {
       protocolParams: protocol.params,
     });
 
-    const commands = await protocol.protocol.getSyncCommands({
+    let commands = await protocol.protocol.getSyncCommands({
       denops: args.denops,
       plugin,
       protocolOptions: protocol.options,
       protocolParams: protocol.params,
     });
+
+    if (revisions[plugin.name]) {
+      // Add rollback commands
+      commands = commands.concat(
+        await protocol.protocol.getRollbackCommands({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+          rev: revisions[plugin.name],
+        }),
+      );
+    }
 
     // Execute commands
     let updateSuccess = true;
@@ -596,10 +632,33 @@ async function saveRollbackFile(
   // Save rollback file
   const basePath = await vars.g.get(denops, "dpp#_base_path");
   const name = await vars.g.get(denops, "dpp#_name");
-  const rollbackDir = `${basePath}/${name}/${getFormattedDate(new Date())}`;
-  await Deno.mkdir(rollbackDir, { recursive: true });
+  for (const date of ["latest", getFormattedDate(new Date())]) {
+    const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
+    await Deno.mkdir(rollbackDir, { recursive: true });
+    const rollbackFile = `${rollbackDir}/rollback.json`;
+    await Deno.writeTextFile(rollbackFile, JSON.stringify(revisions));
+  }
+}
+
+async function loadRollbackFile(
+  denops: Denops,
+  date: string,
+): Promise<Record<string, string>> {
+  // Get revisions
+
+  // Save rollback file
+  const basePath = await vars.g.get(denops, "dpp#_base_path");
+  const name = await vars.g.get(denops, "dpp#_name");
+  const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
   const rollbackFile = `${rollbackDir}/rollback.json`;
-  await Deno.writeTextFile(rollbackFile, JSON.stringify(revisions));
+  if (!await safeStat(rollbackFile)) {
+    return {};
+  }
+
+  return JSON.parse(await Deno.readTextFile(rollbackFile)) as Record<
+    string,
+    string
+  >;
 }
 
 async function limitPromiseConcurrency<T>(

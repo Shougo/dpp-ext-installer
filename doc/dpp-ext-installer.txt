@@ -64,6 +64,8 @@ install
 		params:
 			{names}:	Plugin names.
 					(Default: [])
+			{rollback}:	Rollback date.
+					(Default: "")
 
                                             *dpp-ext-installer-action-recache*
 recache
@@ -79,6 +81,8 @@ reinstall
 		params:
 			{names}:	Plugin names.
 					(Required)
+			{rollback}:	Rollback date.
+					(Default: "")
 
                                             *dpp-ext-installer-action-update*
 update
@@ -87,6 +91,8 @@ update
 		params:
 			{names}:	Plugin names.
 					(Default: [])
+			{rollback}:	Rollback date.
+					(Default: "")
 
 ==============================================================================
 PARAMS                                              *dpp-ext-installer-params*
