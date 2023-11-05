@@ -57,6 +57,14 @@ build
 			{names}:	Plugin names.
 					(Default: [])
 
+                                      *dpp-ext-installer-action-check_install*
+check_install
+		Get not installed plugins.
+
+		params:
+			{names}:	Plugin names.
+					(Default: [])
+
                                             *dpp-ext-installer-action-install*
 install
 		Install plugins.

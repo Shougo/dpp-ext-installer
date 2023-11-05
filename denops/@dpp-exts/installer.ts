@@ -58,6 +58,27 @@ export class Ext extends BaseExt<Params> {
         }
       },
     },
+    check_install: {
+      description: "Get not installed plugins",
+      callback: async (args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
+        actionParams: unknown;
+      }) => {
+        const params = args.actionParams as InstallParams;
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+
+        const bits = await Promise.all(
+          plugins.map(async (plugin) =>
+            plugin.path && !await isDirectory(plugin.path)
+          ),
+        );
+
+        return plugins.filter((_) => bits.shift());
+      },
+    },
     getLogs: {
       description: "Get logs",
       callback: (_args: {
