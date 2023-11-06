@@ -10,6 +10,7 @@ Install			|dpp-ext-installer-install|
 Examples		|dpp-ext-installer-examples|
 Actions			|dpp-ext-installer-actions|
 Params			|dpp-ext-installer-params|
+FAQ			|dpp-ext-installer-faq|
 Compatibility		|dpp-ext-installer-compatibility|
 
 
@@ -125,6 +126,18 @@ maxProcesses
 		The max number of processes used for update.
 
 		Defaults: 5
+
+==============================================================================
+FAQ                                                    *dpp-ext-installer-faq*
+
+FAQ 1:						|dpp-ext-installer-faq-1|
+	The installation/update is slow.
+
+------------------------------------------------------------------------------
+                                                     *dpp-ext-installer-faq-1*
+Q: The installation/update is slow.
+
+A: You can change |dpp-ext-installer-param-maxProcesses| value.
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
