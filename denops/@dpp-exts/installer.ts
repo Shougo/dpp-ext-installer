@@ -312,7 +312,7 @@ export class Ext extends BaseExt<Params> {
 
     await args.denops.call("dpp#ext#installer#_close_progress_window");
 
-    await args.denops.call("dpp#clear_state");
+    await args.denops.call("dpp#make_state");
   }
 
   async updatePlugin(
