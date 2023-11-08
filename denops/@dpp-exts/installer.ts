@@ -422,8 +422,8 @@ export class Ext extends BaseExt<Params> {
         args.denops,
         plugin,
         protocol,
-        newRev,
         oldRev,
+        newRev,
       );
 
       if (oldRev.length === 0 || oldRev !== newRev) {
@@ -444,8 +444,8 @@ export class Ext extends BaseExt<Params> {
     denops: Denops,
     plugin: Plugin,
     protocol: Protocol,
-    newRev: string,
     oldRev: string,
+    newRev: string,
   ): Promise<string> {
     if (newRev === oldRev || newRev.length === 0 || oldRev.length === 0) {
       return "";
@@ -525,8 +525,8 @@ export class Ext extends BaseExt<Params> {
     denops: Denops,
     plugin: Plugin,
     protocol: Protocol,
-    newRev: string,
     oldRev: string,
+    newRev: string,
   ) {
     if (newRev === oldRev || newRev.length === 0 || oldRev.length === 0) {
       return;
