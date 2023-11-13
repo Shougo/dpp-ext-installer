@@ -50,7 +50,7 @@ EXAMPLES                                          *dpp-ext-installer-examples*
 ==============================================================================
 ACTIONS                                            *dpp-ext-installer-actions*
 
-                                            *dpp-ext-installer-action-build*
+                                              *dpp-ext-installer-action-build*
 build
 		Build plugins.
 
@@ -58,8 +58,27 @@ build
 			{names}:	Plugin names.
 					(Default: [])
 
-                                      *dpp-ext-installer-action-check_install*
-check_install
+                                    *dpp-ext-installer-action-checkNotUpdated*
+checkNotUpdated
+		Check not updated plugins by github GraqhQL API.
+		https://docs.github.com/en/graphql
+		NOTE: It is available for github plugins only.
+		NOTE: |dpp-ext-installer-param-githubAPIToken| must be set.
+		NOTE: It does not return value instead of
+		|dpp-ext-installer-action-getNotInstalled|.
+		NOTE: The update check is quicker than
+		|dpp-ext-installer-action-update| but it is not perfect
+		solution. github API cannot detect upstream changes
+		immediately.
+
+		params:
+			{names}:	Plugin names.
+					(Default: [])
+			{force}:	Force update plugins if possible.
+					(Default: false)
+
+                                    *dpp-ext-installer-action-getNotInstalled*
+getNotInstalled
 		Get not installed plugins.
 
 		params:
@@ -116,6 +135,10 @@ checkDiff
                                              *dpp-ext-installer-param-getLogs*
 getLogs
 		Get all previous logs.
+
+                                      *dpp-ext-installer-param-githubAPIToken*
+githubAPIToken
+		Github API token for |dpp-ext-installer-action-checkUpdate|.
 
                                        *dpp-ext-installer-param-getUpdateLogs*
 getUpdateLogs

@@ -20,12 +20,18 @@ import {
 
 type Params = {
   checkDiff: boolean;
+  githubAPIToken: string;
   maxProcesses: number;
 };
 
 type InstallParams = {
-  names: string[];
-  rollback: string;
+  names?: string[];
+  rollback?: string;
+};
+
+type CheckNotUpdatedParams = {
+  names?: string[];
+  force?: boolean;
 };
 
 type UpdatedPlugin = {
@@ -58,7 +64,47 @@ export class Ext extends BaseExt<Params> {
         }
       },
     },
-    check_install: {
+    checkNotUpdated: {
+      description: "Check not updated plugins",
+      callback: async (args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
+        actionParams: unknown;
+      }) => {
+        const params = args.actionParams as CheckNotUpdatedParams;
+
+        const updatedPlugins = (await this.checkUpdatedPlugins(
+          args,
+          await getPlugins(args.denops, params.names ?? []),
+        )).map((plugin) => plugin.name);
+
+        if (updatedPlugins.length === 0) {
+          await this.printMessage(
+            args.denops,
+            "updated plugins are not found.",
+          );
+          return;
+        }
+
+        const force = params.force ?? false;
+        if (
+          !force && await fn.confirm(
+              args.denops,
+              `Updated plugins:\n${updatedPlugins.join("\n")}\n\nUpdate now?`,
+              "yes\nNo",
+              2,
+            ) !== 1
+        ) {
+          return;
+        }
+
+        const plugins = await getPlugins(args.denops, updatedPlugins);
+        await this.updatePlugins(args, plugins, {});
+      },
+    },
+    getNotInstalled: {
       description: "Get not installed plugins",
       callback: async (args: {
         denops: Denops;
@@ -189,6 +235,7 @@ export class Ext extends BaseExt<Params> {
   override params(): Params {
     return {
       checkDiff: false,
+      githubAPIToken: "",
       maxProcesses: 5,
     };
   }
@@ -438,6 +485,94 @@ export class Ext extends BaseExt<Params> {
     } else {
       erroredPlugins.push(plugin);
     }
+  }
+
+  private async checkUpdatedPlugins(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      extParams: Params;
+    },
+    plugins: Plugin[],
+  ): Promise<Plugin[]> {
+    if (plugins.length === 0) {
+      await this.printError(
+        args.denops,
+        "Target plugins are not found.",
+      );
+      await this.printError(
+        args.denops,
+        "You may have used the wrong plugin name," +
+          " or all of the plugins are already installed.",
+      );
+      return [];
+    }
+
+    if (args.extParams.githubAPIToken.length === 0) {
+      await this.printError(
+        args.denops,
+        '"githubAPIToken" must be set.',
+      );
+      return [];
+    }
+
+    // Get the last updated time by rollbackfile timestamp.
+    const basePath = await vars.g.get(args.denops, "dpp#_base_path");
+    const name = await vars.g.get(args.denops, "dpp#_name");
+    const rollbackDir = `${basePath}/${name}/rollbacks/latest`;
+    const rollbackFile = `${rollbackDir}/rollback.json`;
+    const rollbackStat = await safeStat(rollbackFile);
+    const baseUpdated = rollbackStat ? rollbackStat.mtime : null;
+
+    if (!baseUpdated) {
+      // Not updated yet.
+      return plugins;
+    }
+
+    // Create query string.
+    const queries = [];
+    for (const [index, plugin] of plugins.entries()) {
+      if (!plugin.repo) {
+        continue;
+      }
+      const pluginNames = plugin.repo.split(/\//);
+      if (pluginNames.length !== 2) {
+        // Invalid repository name
+        continue;
+      }
+
+      // NOTE: "repository" API is faster than "search" API
+      queries.push(
+        `repo${index}: repository(owner:"${
+          pluginNames.slice(-2, -1)
+        }", name: "${pluginNames.slice(-1)}"){ updatedAt }`,
+      );
+    }
+
+    // POST github API
+    const resp = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${args.extParams.githubAPIToken}`,
+      },
+      body: JSON.stringify({
+        query: `
+          query {
+            ${queries.join("\n")}
+          }
+        `,
+      }),
+    });
+
+    const respJson = (await resp.json()).data;
+    //console.log(respJson);
+    //console.log(baseUpdated);
+
+    return plugins.filter((_, index) =>
+      respJson[`repo${index}`].updatedAt &&
+      new Date(respJson[`repo${index}`].updatedAt) > baseUpdated
+    );
   }
 
   async getLogMessage(
