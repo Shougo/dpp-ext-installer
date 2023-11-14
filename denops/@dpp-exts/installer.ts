@@ -391,6 +391,18 @@ export class Ext extends BaseExt<Params> {
       protocolParams: protocol.params,
     });
 
+    if (plugin.rev) {
+      // Force checkout HEAD revision.
+      // The repository may be checked out.
+      const saveRev = plugin.rev;
+
+      plugin.rev = "";
+
+      await this.revisionLockPlugin(args.denops, plugin, protocol);
+
+      plugin.rev = saveRev;
+    }
+
     let commands = await protocol.protocol.getSyncCommands({
       denops: args.denops,
       plugin,
@@ -444,6 +456,11 @@ export class Ext extends BaseExt<Params> {
         updateSuccess = false;
         break;
       }
+    }
+
+    if (plugin.rev) {
+      // Restore revision
+      await this.revisionLockPlugin(args.denops, plugin, protocol);
     }
 
     if (updateSuccess) {
@@ -656,6 +673,44 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
+  async revisionLockPlugin(
+    denops: Denops,
+    plugin: Plugin,
+    protocol: Protocol,
+  ) {
+    if (!plugin.path || !await isDirectory(plugin.path) || !plugin.rev) {
+      return;
+    }
+
+    const commands = await protocol.protocol.getRevisionLockCommands({
+      denops: denops,
+      plugin,
+      protocolOptions: protocol.options,
+      protocolParams: protocol.params,
+    });
+
+    for (const command of commands) {
+      const proc = new Deno.Command(
+        command.command,
+        {
+          args: command.args,
+          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          stdout: "piped",
+          stderr: "piped",
+        },
+      );
+
+      const { stdout, stderr } = await proc.output();
+
+      for (const line of new TextDecoder().decode(stdout).split(/\r?\n/)) {
+        await this.printProgress(denops, line);
+      }
+
+      for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
+        await this.printError(denops, line);
+      }
+    }
+  }
   async checkDiff(
     denops: Denops,
     plugin: Plugin,
