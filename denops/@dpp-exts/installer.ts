@@ -21,6 +21,7 @@ import {
 type Params = {
   checkDiff: boolean;
   githubAPIToken: string;
+  logFilePath: string;
   maxProcesses: number;
 };
 
@@ -53,6 +54,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
         actionParams: unknown;
       }) => {
         const params = args.actionParams as InstallParams;
@@ -60,7 +62,7 @@ export class Ext extends BaseExt<Params> {
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
         for (const plugin of plugins) {
-          await this.buildPlugin(args.denops, plugin);
+          await this.buildPlugin(args.denops, args.extParams, plugin);
         }
       },
     },
@@ -83,6 +85,7 @@ export class Ext extends BaseExt<Params> {
         if (updatedPlugins.length === 0) {
           await this.printMessage(
             args.denops,
+            args.extParams,
             "updated plugins are not found.",
           );
           return;
@@ -236,6 +239,7 @@ export class Ext extends BaseExt<Params> {
     return {
       checkDiff: false,
       githubAPIToken: "",
+      logFilePath: "",
       maxProcesses: 5,
     };
   }
@@ -257,15 +261,23 @@ export class Ext extends BaseExt<Params> {
     if (plugins.length === 0) {
       await this.printError(
         args.denops,
+        args.extParams,
         "Target plugins are not found.",
       );
       await this.printError(
         args.denops,
+        args.extParams,
         "You may have used the wrong plugin name," +
           " or all of the plugins are already installed.",
       );
       return;
     }
+
+    await this.printMessage(
+      args.denops,
+      args.extParams,
+      `Start: ${new Date()}`,
+    );
 
     const updatedPlugins: UpdatedPlugin[] = [];
     const erroredPlugins: Plugin[] = [];
@@ -314,6 +326,7 @@ export class Ext extends BaseExt<Params> {
       if (args.extParams.checkDiff) {
         await this.checkDiff(
           args.denops,
+          args.extParams,
           updated.plugin,
           updated.protocol,
           updated.oldRev,
@@ -325,6 +338,7 @@ export class Ext extends BaseExt<Params> {
     if (updatedPlugins.length > 0) {
       await this.printMessage(
         args.denops,
+        args.extParams,
         "Updated plugins:\n" +
           `${updatedPlugins.map((updated) => updated.plugin.name).join("\n")}`,
       );
@@ -338,6 +352,7 @@ export class Ext extends BaseExt<Params> {
       if (breakingPlugins.length > 0) {
         await this.printMessage(
           args.denops,
+          args.extParams,
           "Breaking updated plugins:\n" +
             `${
               breakingPlugins.map((updated) => updated.plugin.name).join("\n")
@@ -351,15 +366,22 @@ export class Ext extends BaseExt<Params> {
     if (erroredPlugins.length > 0) {
       await this.printMessage(
         args.denops,
+        args.extParams,
         "Error plugins:\n" +
-          `${erroredPlugins.map((plugin) => plugin.name).join("\n")}` +
-          "Please read the error message log with the :message command.\n",
+          `${erroredPlugins.map((plugin) => plugin.name).join("\n")}\n` +
+          "Please read the error message log with the :message command.",
       );
     }
 
     await args.denops.call("dpp#ext#installer#_close_progress_window");
 
     await args.denops.call("dpp#make_state");
+
+    await this.printMessage(
+      args.denops,
+      args.extParams,
+      `Done : ${new Date()}`,
+    );
   }
 
   async updatePlugin(
@@ -379,6 +401,7 @@ export class Ext extends BaseExt<Params> {
   ) {
     await this.printProgress(
       args.denops,
+      args.extParams,
       `[${index}/${maxLength}] ${plugin.name}`,
     );
 
@@ -398,7 +421,12 @@ export class Ext extends BaseExt<Params> {
 
       plugin.rev = "";
 
-      await this.revisionLockPlugin(args.denops, plugin, protocol);
+      await this.revisionLockPlugin(
+        args.denops,
+        args.extParams,
+        plugin,
+        protocol,
+      );
 
       plugin.rev = saveRev;
     }
@@ -442,14 +470,14 @@ export class Ext extends BaseExt<Params> {
         const line of new TextDecoder().decode(stdout).split(/\r?\n/)
           .filter((line) => line.length > 0)
       ) {
-        await this.printProgress(args.denops, line);
+        await this.printProgress(args.denops, args.extParams, line);
       }
 
       for (
         const line of new TextDecoder().decode(stderr).split(/\r?\n/)
           .filter((line) => line.length > 0)
       ) {
-        await this.printError(args.denops, line);
+        await this.printError(args.denops, args.extParams, line);
       }
 
       if (!success) {
@@ -460,7 +488,12 @@ export class Ext extends BaseExt<Params> {
 
     if (plugin.rev) {
       // Restore revision
-      await this.revisionLockPlugin(args.denops, plugin, protocol);
+      await this.revisionLockPlugin(
+        args.denops,
+        args.extParams,
+        plugin,
+        protocol,
+      );
     }
 
     if (updateSuccess) {
@@ -473,7 +506,7 @@ export class Ext extends BaseExt<Params> {
         );
       }
 
-      await this.buildPlugin(args.denops, plugin);
+      await this.buildPlugin(args.denops, args.extParams, plugin);
 
       const newRev = await protocol.protocol.getRevision({
         denops: args.denops,
@@ -484,6 +517,7 @@ export class Ext extends BaseExt<Params> {
 
       const logMessage = await this.getLogMessage(
         args.denops,
+        args.extParams,
         plugin,
         protocol,
         oldRev,
@@ -515,10 +549,12 @@ export class Ext extends BaseExt<Params> {
     if (plugins.length === 0) {
       await this.printError(
         args.denops,
+        args.extParams,
         "Target plugins are not found.",
       );
       await this.printError(
         args.denops,
+        args.extParams,
         "You may have used the wrong plugin name," +
           " or all of the plugins are already installed.",
       );
@@ -528,6 +564,7 @@ export class Ext extends BaseExt<Params> {
     if (args.extParams.githubAPIToken.length === 0) {
       await this.printError(
         args.denops,
+        args.extParams,
         '"githubAPIToken" must be set.',
       );
       return [];
@@ -593,6 +630,7 @@ export class Ext extends BaseExt<Params> {
 
   async getLogMessage(
     denops: Denops,
+    extParams: Params,
     plugin: Plugin,
     protocol: Protocol,
     oldRev: string,
@@ -628,7 +666,7 @@ export class Ext extends BaseExt<Params> {
       logMessage += new TextDecoder().decode(stdout);
 
       for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.printError(denops, line);
+        await this.printError(denops, extParams, line);
       }
     }
 
@@ -637,6 +675,7 @@ export class Ext extends BaseExt<Params> {
 
   async buildPlugin(
     denops: Denops,
+    extParams: Params,
     plugin: Plugin,
   ) {
     if (!plugin.path || !await isDirectory(plugin.path) || !plugin.build) {
@@ -660,7 +699,7 @@ export class Ext extends BaseExt<Params> {
         line,
       ) => line.length > 0)
     ) {
-      await this.printProgress(denops, line);
+      await this.printProgress(denops, extParams, line);
     }
 
     for (
@@ -668,12 +707,13 @@ export class Ext extends BaseExt<Params> {
         line,
       ) => line.length > 0)
     ) {
-      await this.printError(denops, line);
+      await this.printError(denops, extParams, line);
     }
   }
 
   async revisionLockPlugin(
     denops: Denops,
+    extParams: Params,
     plugin: Plugin,
     protocol: Protocol,
   ) {
@@ -702,16 +742,17 @@ export class Ext extends BaseExt<Params> {
       const { stdout, stderr } = await proc.output();
 
       for (const line of new TextDecoder().decode(stdout).split(/\r?\n/)) {
-        await this.printProgress(denops, line);
+        await this.printProgress(denops, extParams, line);
       }
 
       for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.printError(denops, line);
+        await this.printError(denops, extParams, line);
       }
     }
   }
   async checkDiff(
     denops: Denops,
+    extParams: Params,
     plugin: Plugin,
     protocol: Protocol,
     oldRev: string,
@@ -748,26 +789,60 @@ export class Ext extends BaseExt<Params> {
       }
 
       for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.printError(denops, line);
+        await this.printError(denops, extParams, line);
       }
     }
   }
 
-  private async printError(denops: Denops, msg: string) {
+  private async printError(
+    denops: Denops,
+    protocolParams: Params,
+    msg: string,
+  ) {
     await denops.call("dpp#util#_error", msg);
     this.updateLogs.push(msg);
     this.logs.push(msg);
+
+    this.outputLogFile(denops, protocolParams, msg);
   }
 
-  private async printMessage(denops: Denops, msg: string) {
+  private async printMessage(
+    denops: Denops,
+    protocolParams: Params,
+    msg: string,
+  ) {
     await denops.call("dpp#ext#installer#_print_message", msg);
     this.updateLogs.push(msg);
     this.logs.push(msg);
+
+    this.outputLogFile(denops, protocolParams, msg);
   }
 
-  private async printProgress(denops: Denops, msg: string) {
+  private async printProgress(
+    denops: Denops,
+    protocolParams: Params,
+    msg: string,
+  ) {
     await denops.call("dpp#ext#installer#_print_progress_message", msg);
     this.logs.push(msg);
+
+    this.outputLogFile(denops, protocolParams, msg);
+  }
+
+  private async outputLogFile(
+    denops: Denops,
+    protocolParams: Params,
+    msg: string,
+  ) {
+    if (protocolParams.logFilePath.length === 0) {
+      return;
+    }
+
+    const logFilePath = await denops.call(
+      "dpp#util#_expand",
+      protocolParams.logFilePath,
+    ) as string;
+    await Deno.writeTextFile(logFilePath, `${msg}\n`, { append: true });
   }
 }
 
