@@ -562,7 +562,7 @@ export class Ext extends BaseExt<Params> {
       queries.push(
         `repo${index}: repository(owner:"${
           pluginNames.slice(-2, -1)
-        }", name: "${pluginNames.slice(-1)}"){ updatedAt }`,
+        }", name: "${pluginNames.slice(-1)}"){ pushedAt }`,
       );
     }
 
@@ -583,12 +583,11 @@ export class Ext extends BaseExt<Params> {
     });
 
     const respJson = (await resp.json()).data;
-    //console.log(respJson);
     //console.log(baseUpdated);
 
     return plugins.filter((_, index) =>
-      respJson[`repo${index}`].updatedAt &&
-      new Date(respJson[`repo${index}`].updatedAt) > baseUpdated
+      respJson[`repo${index}`]?.pushedAt &&
+      new Date(respJson[`repo${index}`].pushedAt) > baseUpdated
     );
   }
 
