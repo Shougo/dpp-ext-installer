@@ -107,6 +107,24 @@ export class Ext extends BaseExt<Params> {
         await this.updatePlugins(args, plugins, {});
       },
     },
+    denoCache: {
+      description: "Execute deno cache for plugins",
+      callback: async (args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
+        actionParams: unknown;
+      }) => {
+        const params = args.actionParams as InstallParams;
+
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+
+        for (const plugin of plugins) {
+          await this.denoCachePlugin(args.denops, args.extParams, plugin);
+        }
+      },
+    },
     getNotInstalled: {
       description: "Get not installed plugins",
       callback: async (args: {
@@ -508,6 +526,8 @@ export class Ext extends BaseExt<Params> {
 
       await this.buildPlugin(args.denops, args.extParams, plugin);
 
+      await this.denoCachePlugin(args.denops, args.extParams, plugin);
+
       const newRev = await protocol.protocol.getRevision({
         denops: args.denops,
         plugin,
@@ -686,6 +706,55 @@ export class Ext extends BaseExt<Params> {
       await op.shell.getGlobal(denops),
       {
         args: [await op.shellcmdflag.getGlobal(denops), plugin.build],
+        cwd: plugin.path,
+        stdout: "piped",
+        stderr: "piped",
+      },
+    );
+
+    const { stdout, stderr } = await proc.output();
+
+    for (
+      const line of new TextDecoder().decode(stdout).split(/\r?\n/).filter((
+        line,
+      ) => line.length > 0)
+    ) {
+      await this.printProgress(denops, extParams, line);
+    }
+
+    for (
+      const line of new TextDecoder().decode(stderr).split(/\r?\n/).filter((
+        line,
+      ) => line.length > 0)
+    ) {
+      await this.printError(denops, extParams, line);
+    }
+  }
+
+  async denoCachePlugin(
+    denops: Denops,
+    extParams: Params,
+    plugin: Plugin,
+  ) {
+    if (
+      !plugin.path || !await isDirectory(`${plugin.path}/denops`) ||
+      !await fn.executable(denops, "deno")
+    ) {
+      return;
+    }
+
+    // Execute "deno cache" to optimize
+    const proc = new Deno.Command(
+      "deno",
+      {
+        args: ["cache", "--no-check"].concat(
+          await fn.glob(
+            denops,
+            `${plugin.path}/denops/**/*.ts`,
+            true,
+            true,
+          ) as string[],
+        ),
         cwd: plugin.path,
         stdout: "piped",
         stderr: "piped",
