@@ -44,8 +44,8 @@ type UpdatedPlugin = {
 };
 
 export class Ext extends BaseExt<Params> {
-  private updateLogs: string[] = [];
-  private logs: string[] = [];
+  #updateLogs: string[] = [];
+  #logs: string[] = [];
 
   override actions: Actions<Params> = {
     build: {
@@ -77,13 +77,13 @@ export class Ext extends BaseExt<Params> {
       }) => {
         const params = args.actionParams as CheckNotUpdatedParams;
 
-        const updatedPlugins = (await this.checkUpdatedPlugins(
+        const updatedPlugins = (await this.#checkUpdatedPlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
         )).map((plugin) => plugin.name);
 
         if (updatedPlugins.length === 0) {
-          await this.printMessage(
+          await this.#printMessage(
             args.denops,
             args.extParams,
             "updated plugins are not found.",
@@ -104,7 +104,7 @@ export class Ext extends BaseExt<Params> {
         }
 
         const plugins = await getPlugins(args.denops, updatedPlugins);
-        await this.updatePlugins(args, plugins, {});
+        await this.#updatePlugins(args, plugins, {});
       },
     },
     denoCache: {
@@ -154,7 +154,7 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
-        return this.logs;
+        return this.#logs;
       },
     },
     getUpdateLogs: {
@@ -165,7 +165,7 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         actionParams: unknown;
       }) => {
-        return this.updateLogs;
+        return this.#updateLogs;
       },
     },
     install: {
@@ -190,7 +190,7 @@ export class Ext extends BaseExt<Params> {
           ),
         );
 
-        await this.updatePlugins(
+        await this.#updatePlugins(
           args,
           plugins.filter((_) => bits.shift()),
           revisions,
@@ -213,7 +213,7 @@ export class Ext extends BaseExt<Params> {
           ? await loadRollbackFile(args.denops, params.rollback)
           : {};
 
-        await this.updatePlugins(args, plugins, revisions);
+        await this.#updatePlugins(args, plugins, revisions);
       },
     },
     reinstall: {
@@ -248,7 +248,7 @@ export class Ext extends BaseExt<Params> {
           }
         }
 
-        await this.updatePlugins(args, plugins, revisions);
+        await this.#updatePlugins(args, plugins, revisions);
       },
     },
   };
@@ -262,7 +262,7 @@ export class Ext extends BaseExt<Params> {
     };
   }
 
-  private async updatePlugins(
+  async #updatePlugins(
     args: {
       denops: Denops;
       options: DppOptions;
@@ -273,16 +273,16 @@ export class Ext extends BaseExt<Params> {
     plugins: Plugin[],
     revisions: Record<string, string>,
   ) {
-    this.logs = [];
-    this.updateLogs = [];
+    this.#logs = [];
+    this.#updateLogs = [];
 
     if (plugins.length === 0) {
-      await this.printError(
+      await this.#printError(
         args.denops,
         args.extParams,
         "Target plugins are not found.",
       );
-      await this.printError(
+      await this.#printError(
         args.denops,
         args.extParams,
         "You may have used the wrong plugin name," +
@@ -291,7 +291,7 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
-    await this.printMessage(
+    await this.#printMessage(
       args.denops,
       args.extParams,
       `Start: ${new Date()}`,
@@ -354,7 +354,7 @@ export class Ext extends BaseExt<Params> {
     }
 
     if (updatedPlugins.length > 0) {
-      await this.printMessage(
+      await this.#printMessage(
         args.denops,
         args.extParams,
         "Updated plugins:\n" +
@@ -368,7 +368,7 @@ export class Ext extends BaseExt<Params> {
       );
 
       if (breakingPlugins.length > 0) {
-        await this.printMessage(
+        await this.#printMessage(
           args.denops,
           args.extParams,
           "Breaking updated plugins:\n" +
@@ -382,7 +382,7 @@ export class Ext extends BaseExt<Params> {
     }
 
     if (erroredPlugins.length > 0) {
-      await this.printMessage(
+      await this.#printMessage(
         args.denops,
         args.extParams,
         "Error plugins:\n" +
@@ -395,7 +395,7 @@ export class Ext extends BaseExt<Params> {
 
     await args.denops.call("dpp#make_state");
 
-    await this.printMessage(
+    await this.#printMessage(
       args.denops,
       args.extParams,
       `Done : ${new Date()}`,
@@ -417,7 +417,7 @@ export class Ext extends BaseExt<Params> {
     plugin: Plugin,
     index: number,
   ) {
-    await this.printProgress(
+    await this.#printProgress(
       args.denops,
       args.extParams,
       `[${index}/${maxLength}] ${plugin.name}`,
@@ -488,14 +488,14 @@ export class Ext extends BaseExt<Params> {
         const line of new TextDecoder().decode(stdout).split(/\r?\n/)
           .filter((line) => line.length > 0)
       ) {
-        await this.printProgress(args.denops, args.extParams, line);
+        await this.#printProgress(args.denops, args.extParams, line);
       }
 
       for (
         const line of new TextDecoder().decode(stderr).split(/\r?\n/)
           .filter((line) => line.length > 0)
       ) {
-        await this.printError(args.denops, args.extParams, line);
+        await this.#printError(args.denops, args.extParams, line);
       }
 
       if (!success) {
@@ -558,7 +558,7 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
-  private async checkUpdatedPlugins(
+  async #checkUpdatedPlugins(
     args: {
       denops: Denops;
       options: DppOptions;
@@ -567,12 +567,12 @@ export class Ext extends BaseExt<Params> {
     plugins: Plugin[],
   ): Promise<Plugin[]> {
     if (plugins.length === 0) {
-      await this.printError(
+      await this.#printError(
         args.denops,
         args.extParams,
         "Target plugins are not found.",
       );
-      await this.printError(
+      await this.#printError(
         args.denops,
         args.extParams,
         "You may have used the wrong plugin name," +
@@ -582,7 +582,7 @@ export class Ext extends BaseExt<Params> {
     }
 
     if (args.extParams.githubAPIToken.length === 0) {
-      await this.printError(
+      await this.#printError(
         args.denops,
         args.extParams,
         '"githubAPIToken" must be set.',
@@ -686,7 +686,7 @@ export class Ext extends BaseExt<Params> {
       logMessage += new TextDecoder().decode(stdout);
 
       for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.printError(denops, extParams, line);
+        await this.#printError(denops, extParams, line);
       }
     }
 
@@ -719,7 +719,7 @@ export class Ext extends BaseExt<Params> {
         line,
       ) => line.length > 0)
     ) {
-      await this.printProgress(denops, extParams, line);
+      await this.#printProgress(denops, extParams, line);
     }
 
     for (
@@ -727,7 +727,7 @@ export class Ext extends BaseExt<Params> {
         line,
       ) => line.length > 0)
     ) {
-      await this.printError(denops, extParams, line);
+      await this.#printError(denops, extParams, line);
     }
   }
 
@@ -768,7 +768,7 @@ export class Ext extends BaseExt<Params> {
         line,
       ) => line.length > 0)
     ) {
-      await this.printProgress(denops, extParams, line);
+      await this.#printProgress(denops, extParams, line);
     }
 
     for (
@@ -776,7 +776,7 @@ export class Ext extends BaseExt<Params> {
         line,
       ) => line.length > 0)
     ) {
-      await this.printError(denops, extParams, line);
+      await this.#printError(denops, extParams, line);
     }
   }
 
@@ -811,11 +811,11 @@ export class Ext extends BaseExt<Params> {
       const { stdout, stderr } = await proc.output();
 
       for (const line of new TextDecoder().decode(stdout).split(/\r?\n/)) {
-        await this.printProgress(denops, extParams, line);
+        await this.#printProgress(denops, extParams, line);
       }
 
       for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.printError(denops, extParams, line);
+        await this.#printError(denops, extParams, line);
       }
     }
   }
@@ -858,47 +858,47 @@ export class Ext extends BaseExt<Params> {
       }
 
       for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.printError(denops, extParams, line);
+        await this.#printError(denops, extParams, line);
       }
     }
   }
 
-  private async printError(
+  async #printError(
     denops: Denops,
     protocolParams: Params,
     msg: string,
   ) {
     await denops.call("dpp#util#_error", msg);
-    this.updateLogs.push(msg);
-    this.logs.push(msg);
+    this.#updateLogs.push(msg);
+    this.#logs.push(msg);
 
-    this.outputLogFile(denops, protocolParams, msg);
+    this.#outputLogFile(denops, protocolParams, msg);
   }
 
-  private async printMessage(
+  async #printMessage(
     denops: Denops,
     protocolParams: Params,
     msg: string,
   ) {
     await denops.call("dpp#ext#installer#_print_message", msg);
-    this.updateLogs.push(msg);
-    this.logs.push(msg);
+    this.#updateLogs.push(msg);
+    this.#logs.push(msg);
 
-    this.outputLogFile(denops, protocolParams, msg);
+    this.#outputLogFile(denops, protocolParams, msg);
   }
 
-  private async printProgress(
+  async #printProgress(
     denops: Denops,
     protocolParams: Params,
     msg: string,
   ) {
     await denops.call("dpp#ext#installer#_print_progress_message", msg);
-    this.logs.push(msg);
+    this.#logs.push(msg);
 
-    this.outputLogFile(denops, protocolParams, msg);
+    this.#outputLogFile(denops, protocolParams, msg);
   }
 
-  private async outputLogFile(
+  async #outputLogFile(
     denops: Denops,
     protocolParams: Params,
     msg: string,
