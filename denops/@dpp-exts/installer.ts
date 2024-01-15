@@ -5,18 +5,19 @@ import {
   Plugin,
   Protocol,
   ProtocolName,
-} from "https://deno.land/x/dpp_vim@v0.0.7/types.ts";
+} from "https://deno.land/x/dpp_vim@v0.0.9/types.ts";
 import {
   Denops,
   fn,
   op,
   vars,
-} from "https://deno.land/x/dpp_vim@v0.0.7/deps.ts";
+} from "https://deno.land/x/dpp_vim@v0.0.9/deps.ts";
 import {
   convert2List,
   isDirectory,
   safeStat,
-} from "https://deno.land/x/dpp_vim@v0.0.7/utils.ts";
+} from "https://deno.land/x/dpp_vim@v0.0.9/utils.ts";
+import { expandGlob } from "https://deno.land/std@0.212.0/fs/expand_glob.ts";
 
 type Params = {
   checkDiff: boolean;
@@ -743,18 +744,16 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
+    const files = [];
+    for await (const file of expandGlob(`${plugin.path}/denops/**/*.ts`)) {
+      files.push(file.path);
+    }
+
     // Execute "deno cache" to optimize
     const proc = new Deno.Command(
       "deno",
       {
-        args: ["cache", "--no-check"].concat(
-          await fn.glob(
-            denops,
-            `${plugin.path}/denops/**/*.ts`,
-            true,
-            true,
-          ) as string[],
-        ),
+        args: ["cache", "--no-check"].concat(files),
         cwd: plugin.path,
         stdout: "piped",
         stderr: "piped",
