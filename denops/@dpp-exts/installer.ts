@@ -938,7 +938,7 @@ async function outputCheckDiff(denops: Denops, line: string) {
     return;
   }
 
-  const bufname = "dein-diff";
+  const bufname = "dpp-diff";
   const bufnr = await fn.bufexists(denops, bufname)
     ? await fn.bufnr(denops, bufname)
     : await fn.bufadd(denops, bufname);
