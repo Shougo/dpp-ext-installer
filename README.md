@@ -21,9 +21,9 @@ https://github.com/Shougo/dpp.vim
 	" Update plugins
 	call dpp#async_ext_action('installer', 'update')
 
-	" Update dein.vim
+	" Update dpp.vim
 	call dpp#async_ext_action('installer', 'update',
-	\ #{ names: ['dein.vim'] })
+	\ #{ names: ['dpp.vim'] })
 
 	" Check not updated plugins
 	call dpp#async_ext_action('installer', 'checkNotUpdated')
