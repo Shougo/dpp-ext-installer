@@ -162,7 +162,7 @@ checkDiff
 
                                       *dpp-ext-installer-param-githubAPIToken*
 githubAPIToken
-		Github API token for |dpp-ext-installer-action-checkUpdate|.
+		Github API token for |dpp-ext-installer-action-checkNotUpdated|.
 
 		Defaults: ""
 
