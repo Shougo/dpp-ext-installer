@@ -5,19 +5,20 @@ import {
   Plugin,
   Protocol,
   ProtocolName,
-} from "https://deno.land/x/dpp_vim@v0.0.9/types.ts";
+} from "https://deno.land/x/dpp_vim@v0.2.0/types.ts";
 import {
   Denops,
   fn,
   op,
   vars,
-} from "https://deno.land/x/dpp_vim@v0.0.9/deps.ts";
+} from "https://deno.land/x/dpp_vim@v0.2.0/deps.ts";
 import {
   convert2List,
   isDirectory,
+  printError,
   safeStat,
-} from "https://deno.land/x/dpp_vim@v0.0.9/utils.ts";
-import { expandGlob } from "https://deno.land/std@0.212.0/fs/expand_glob.ts";
+} from "https://deno.land/x/dpp_vim@v0.2.0/utils.ts";
+import { expandGlob } from "https://deno.land/std@0.223.0/fs/expand_glob.ts";
 
 type Params = {
   checkDiff: boolean;
@@ -229,8 +230,8 @@ export class Ext extends BaseExt<Params> {
         const params = args.actionParams as InstallParams;
         if (!params.names || params.names.length === 0) {
           // NOTE: names must be set.
-          await args.denops.call(
-            "dpp#util#_error",
+          await printError(
+            args.denops,
             "names must be set for reinstall plugins.",
           );
           return;
@@ -867,7 +868,7 @@ export class Ext extends BaseExt<Params> {
     protocolParams: Params,
     msg: string,
   ) {
-    await denops.call("dpp#util#_error", msg);
+    await printError(denops, msg);
     this.#updateLogs.push(msg);
     this.#logs.push(msg);
 
