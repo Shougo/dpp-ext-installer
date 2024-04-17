@@ -45,6 +45,8 @@ type UpdatedPlugin = {
   protocol: Protocol;
 };
 
+type Rollbacks = Record<string, string>;
+
 export class Ext extends BaseExt<Params> {
   #updateLogs: string[] = [];
   #logs: string[] = [];
@@ -961,7 +963,7 @@ async function saveRollbackFile(
   protocols: Record<ProtocolName, Protocol>,
 ) {
   // Get revisions
-  const revisions: Record<string, string> = {};
+  const revisions: Rollbacks = {};
   for (const plugin of await getPlugins(denops, [])) {
     const protocol = protocols[plugin.protocol ?? ""];
     revisions[plugin.name] = await protocol.protocol.getRevision({
@@ -1009,10 +1011,7 @@ async function loadRollbackFile(
     return {};
   }
 
-  return JSON.parse(await Deno.readTextFile(rollbackFile)) as Record<
-    string,
-    string
-  >;
+  return JSON.parse(await Deno.readTextFile(rollbackFile)) as Rollbacks;
 }
 
 async function limitPromiseConcurrency<T>(
