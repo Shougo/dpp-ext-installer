@@ -1,6 +1,6 @@
 # dpp-ext-installer
 
-This ext implements installer.
+This ext implements plugins installer.
 
 ## Required
 
@@ -20,6 +20,10 @@ https://github.com/Shougo/dpp.vim
 
 	" Update plugins
 	call dpp#async_ext_action('installer', 'update')
+
+	" Update plugins with specify rollback revisions
+	call dpp#async_ext_action('installer', 'update',
+	\ #{ rollback: 'latest' })
 
 	" Update dpp.vim
 	call dpp#async_ext_action('installer', 'update',

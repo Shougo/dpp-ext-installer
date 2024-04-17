@@ -17,7 +17,7 @@ Compatibility		|dpp-ext-installer-compatibility|
 ==============================================================================
 INTRODUCTION                                  *dpp-ext-installer-introduction*
 
-This ext implements installer.
+This ext implements plugins installer.
 
 NOTE: It does not work for |dpp-plugin-option-frozen| and
 |dpp-plugin-option-local| plugins.
@@ -44,6 +44,10 @@ EXAMPLES                                          *dpp-ext-installer-examples*
 
 	" Update plugins
 	call dpp#async_ext_action('installer', 'update')
+
+	" Update plugins with specify rollback revisions
+	call dpp#async_ext_action('installer', 'update',
+	\ #{ rollback: 'latest' })
 
 	" Update dpp.vim
 	call dpp#async_ext_action('installer', 'update',
@@ -117,6 +121,9 @@ getUpdateLogs
 install
 		Install plugins.
 
+		NOTE: The rollback file is saved under
+		"{base-path}/{name}/{YYMMDDhhmmss}" directory.
+
 		params:
 			{names}:	Plugin names.
 					(Default: [])
@@ -136,6 +143,9 @@ recache
 reinstall
 		Reinstall plugins.
 
+		NOTE: The rollback file is saved under
+		"{base-path}/{name}/{YYMMDDhhmmss}" directory.
+
 		params:
 			{names}:	Plugin names.
 					(Required)
@@ -144,9 +154,12 @@ reinstall
 					"latest".
 					(Default: "")
 
-                                            *dpp-ext-installer-action-update*
+                                             *dpp-ext-installer-action-update*
 update
 		Update plugins.
+
+		NOTE: The rollback file is saved under
+		"{base-path}/{name}/{YYMMDDhhmmss}" directory.
 
 		params:
 			{names}:	Plugin names.
@@ -168,7 +181,8 @@ checkDiff
 
                                       *dpp-ext-installer-param-githubAPIToken*
 githubAPIToken
-		Github API token for |dpp-ext-installer-action-checkNotUpdated|.
+		Github API token for
+		|dpp-ext-installer-action-checkNotUpdated|.
 
 		Defaults: ""
 
@@ -187,10 +201,10 @@ maxProcesses
 ==============================================================================
 FAQ                                                    *dpp-ext-installer-faq*
 
-FAQ 1:						|dpp-ext-installer-faq-1|
+FAQ 1:                                               |dpp-ext-installer-faq-1|
 	The installation/update is slow.
 
-FAQ 2:						|dpp-ext-installer-faq-2|
+FAQ 2:                                               |dpp-ext-installer-faq-2|
 	I want to update from shell.
 
 ------------------------------------------------------------------------------
