@@ -121,6 +121,8 @@ install
 			{names}:	Plugin names.
 					(Default: [])
 			{rollback}:	Rollback date.
+					It must be "YYMMDDhhmmss" format or
+					"latest".
 					(Default: "")
 
                                             *dpp-ext-installer-action-recache*
@@ -138,6 +140,8 @@ reinstall
 			{names}:	Plugin names.
 					(Required)
 			{rollback}:	Rollback date.
+					It must be "YYMMDDhhmmss" format or
+					"latest".
 					(Default: "")
 
                                             *dpp-ext-installer-action-update*
@@ -148,6 +152,8 @@ update
 			{names}:	Plugin names.
 					(Default: [])
 			{rollback}:	Rollback date.
+					It must be "YYMMDDhhmmss" format or
+					"latest".
 					(Default: "")
 
 ==============================================================================
