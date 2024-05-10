@@ -18,7 +18,7 @@ import {
   printError,
   safeStat,
 } from "https://deno.land/x/dpp_vim@v0.2.0/utils.ts";
-import { expandGlob } from "https://deno.land/std@0.223.0/fs/expand_glob.ts";
+import { expandGlob } from "jsr:@std/fs@0.224.0/expand-glob";
 
 type Params = {
   checkDiff: boolean;
