@@ -18,7 +18,7 @@ import {
   printError,
   safeStat,
 } from "https://deno.land/x/dpp_vim@v0.2.0/utils.ts";
-import { expandGlob } from "jsr:@std/fs@0.224.0/expand-glob";
+import { expandGlob } from "jsr:@std/fs@0.229.1/expand-glob";
 
 type Params = {
   checkDiff: boolean;
@@ -946,7 +946,9 @@ async function outputCheckDiff(denops: Denops, line: string) {
     ? await fn.bufnr(denops, bufname)
     : await fn.bufadd(denops, bufname);
 
-  if (await fn.bufwinnr(denops, bufnr) < 0) {
+  if (
+    await fn.bufwinnr(denops, bufnr) < 0 && await fn.bufexists(denops, bufnr)
+  ) {
     const cmd = await fn.escape(
       denops,
       "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable",
