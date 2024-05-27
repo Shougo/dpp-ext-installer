@@ -7,6 +7,7 @@ import {
   ProtocolName,
 } from "https://deno.land/x/dpp_vim@v0.2.0/types.ts";
 import {
+  autocmd,
   Denops,
   fn,
   op,
@@ -50,6 +51,18 @@ type Rollbacks = Record<string, string>;
 export class Ext extends BaseExt<Params> {
   #updateLogs: string[] = [];
   #logs: string[] = [];
+
+  override async onInit(args: {
+    denops: Denops;
+  }) {
+    await autocmd.group(args.denops, "dpp", (helper: autocmd.GroupHelper) => {
+      helper.define(
+        "User",
+        "dpp:ext:installer:updateDone",
+        ":",
+      );
+    });
+  }
 
   override actions: Actions<Params> = {
     build: {
@@ -292,6 +305,11 @@ export class Ext extends BaseExt<Params> {
         "You may have used the wrong plugin name," +
           " or all of the plugins are already installed.",
       );
+
+      await args.denops.cmd(
+        "doautocmd User Dpp:ext:installer:updateDone"
+      );
+
       return;
     }
 
@@ -403,6 +421,10 @@ export class Ext extends BaseExt<Params> {
       args.denops,
       args.extParams,
       `Done : ${new Date()}`,
+    );
+
+    await args.denops.cmd(
+      "doautocmd User Dpp:ext:installer:updateDone"
     );
   }
 

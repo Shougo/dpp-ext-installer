@@ -7,9 +7,11 @@ CONTENTS                                          *dpp-ext-installer-contents*
 
 Introduction		|dpp-ext-installer-introduction|
 Install			|dpp-ext-installer-install|
+Interface		|dpp-ext-installer-interface|
+  Actions		  |dpp-ext-installer-actions|
+  Params		  |dpp-ext-installer-params|
+  Autocmds		  |dpp-ext-installer-autocmds|
 Examples		|dpp-ext-installer-examples|
-Actions			|dpp-ext-installer-actions|
-Params			|dpp-ext-installer-params|
 FAQ			|dpp-ext-installer-faq|
 Compatibility		|dpp-ext-installer-compatibility|
 
@@ -37,30 +39,10 @@ https://github.com/Shougo/dpp-protocol-git
 
 
 ==============================================================================
-EXAMPLES                                          *dpp-ext-installer-examples*
->
-	" Install plugins
-	call dpp#async_ext_action('installer', 'install')
+INTERFACE                                        *dpp-ext-installer-interface*
 
-	" Update plugins
-	call dpp#async_ext_action('installer', 'update')
 
-	" Update plugins with specify rollback revisions
-	call dpp#async_ext_action('installer', 'update',
-	\ #{ rollback: 'latest' })
-
-	" Update dpp.vim
-	call dpp#async_ext_action('installer', 'update',
-	\ #{ names: ['dpp.vim'] })
-
-	" Check not updated plugins
-	call dpp#async_ext_action('installer', 'checkNotUpdated')
-
-	" Get not installed plugins
-	echo dpp#sync_ext_action('installer', 'getNotInstalled')
-<
-
-==============================================================================
+------------------------------------------------------------------------------
 ACTIONS                                            *dpp-ext-installer-actions*
 
                                               *dpp-ext-installer-action-build*
@@ -169,7 +151,7 @@ update
 					"latest".
 					(Default: "")
 
-==============================================================================
+------------------------------------------------------------------------------
 PARAMS                                              *dpp-ext-installer-params*
 
                                            *dpp-ext-installer-param-checkDiff*
@@ -198,6 +180,40 @@ maxProcesses
 
 		Defaults: 5
 
+------------------------------------------------------------------------------
+AUTOCMDS                                          *dpp-ext-installer-autocmds*
+
+dpp-ext-installer defines some |User| autocmds.
+
+                      *dpp-ext-installer-autocmd-Dpp:ext:installer:updateDone*
+Dpp:ext:installer:updateDone
+		Called after updated plugins.
+		NOTE: It is called if updated plugins are empty.
+
+==============================================================================
+EXAMPLES                                          *dpp-ext-installer-examples*
+>
+	" Install plugins
+	call dpp#async_ext_action('installer', 'install')
+
+	" Update plugins
+	call dpp#async_ext_action('installer', 'update')
+
+	" Update plugins with specify rollback revisions
+	call dpp#async_ext_action('installer', 'update',
+	\ #{ rollback: 'latest' })
+
+	" Update dpp.vim
+	call dpp#async_ext_action('installer', 'update',
+	\ #{ names: ['dpp.vim'] })
+
+	" Check not updated plugins
+	call dpp#async_ext_action('installer', 'checkNotUpdated')
+
+	" Get not installed plugins
+	echo dpp#sync_ext_action('installer', 'getNotInstalled')
+<
+
 ==============================================================================
 FAQ                                                    *dpp-ext-installer-faq*
 
@@ -206,6 +222,9 @@ FAQ 1:                                               |dpp-ext-installer-faq-1|
 
 FAQ 2:                                               |dpp-ext-installer-faq-2|
 	I want to update from shell.
+
+FAQ 3:                                               |dpp-ext-installer-faq-3|
+	I want to quit Vim after updated plugins.
 
 ------------------------------------------------------------------------------
                                                      *dpp-ext-installer-faq-1*
@@ -218,6 +237,12 @@ Q: I want to update from shell.
 
 A: Sorry.  It is not supported.  I have tested it, but it does not work.
 
+                                                     *dpp-ext-installer-faq-3*
+Q: I want to quit Vim after updated plugins.
+
+A: >
+	autocmd User Dpp:ext:installer:updateDone quit
+>
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
