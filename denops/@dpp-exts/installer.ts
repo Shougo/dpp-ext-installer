@@ -420,7 +420,7 @@ export class Ext extends BaseExt<Params> {
     await this.#printMessage(
       args.denops,
       args.extParams,
-      `Done : ${new Date()}`,
+      `Done: ${new Date()}`,
     );
 
     await args.denops.cmd(
