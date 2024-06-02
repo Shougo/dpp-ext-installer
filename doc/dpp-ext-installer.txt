@@ -240,6 +240,9 @@ FAQ 2:                                               |dpp-ext-installer-faq-2|
 FAQ 3:                                               |dpp-ext-installer-faq-3|
 	I want to quit Vim after updated plugins.
 
+FAQ 4:                                               |dpp-ext-installer-faq-4|
+	I want to get not updated plugins by Ddu.
+
 ------------------------------------------------------------------------------
                                                      *dpp-ext-installer-faq-1*
 Q: The installation/update is slow.
@@ -256,7 +259,23 @@ Q: I want to quit Vim after updated plugins.
 
 A: >
 	autocmd User Dpp:ext:installer:updateDone quit
->
+<
+
+                                                     *dpp-ext-installer-faq-4*
+Q: I want to get not updated plugins by Ddu.
+
+A: >
+	call ddu#start(#{
+	    \   sources: [
+	    \     #{
+	    \       name: 'dpp',
+	    \       params: #{
+	    \         names: dpp#sync_ext_action('installer', 'getNotUpdated')
+	    \                ->map({_, val -> val.name}),
+	    \       },
+	    \     },
+	    \   ],
+	    \ })
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
