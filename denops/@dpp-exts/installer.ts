@@ -163,6 +163,24 @@ export class Ext extends BaseExt<Params> {
         return plugins.filter((_) => bits.shift());
       },
     },
+    getNotUpdated: {
+      description: "Get not updated plugins",
+      callback: async (args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
+        actionParams: unknown;
+      }) => {
+        const params = args.actionParams as InstallParams;
+        const plugins = (await this.#checkUpdatedPlugins(
+          args,
+          await getPlugins(args.denops, params.names ?? []),
+        ));
+
+        return plugins;
+      },
+    },
     getLogs: {
       description: "Get logs",
       callback: (_args: {
