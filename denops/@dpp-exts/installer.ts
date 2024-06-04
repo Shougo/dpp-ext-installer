@@ -796,7 +796,7 @@ export class Ext extends BaseExt<Params> {
     const proc = new Deno.Command(
       "deno",
       {
-        args: ["cache", "--no-check"].concat(files),
+        args: ["cache", "--no-check", "--reload"].concat(files),
         cwd: plugin.path,
         stdout: "piped",
         stderr: "piped",

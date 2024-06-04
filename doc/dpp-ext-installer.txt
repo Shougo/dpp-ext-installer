@@ -74,7 +74,7 @@ checkNotUpdated
 
                                           *dpp-ext-installer-action-denoCache*
 denoCache
-		Execute "deno cache" for plugins.
+		Execute "deno cache --reload" for plugins.
 		NOTE: "deno" command is required.
 		NOTE: It is also executed when plugins are installed/updated.
 
