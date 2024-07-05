@@ -173,10 +173,10 @@ export class Ext extends BaseExt<Params> {
         actionParams: unknown;
       }) => {
         const params = args.actionParams as InstallParams;
-        const plugins = (await this.#checkUpdatedPlugins(
+        const plugins = await this.#checkUpdatedPlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
-        ));
+        );
 
         return plugins;
       },
@@ -325,7 +325,7 @@ export class Ext extends BaseExt<Params> {
       );
 
       await args.denops.cmd(
-        "doautocmd User Dpp:ext:installer:updateDone"
+        "doautocmd User Dpp:ext:installer:updateDone",
       );
 
       return;
@@ -442,7 +442,7 @@ export class Ext extends BaseExt<Params> {
     );
 
     await args.denops.cmd(
-      "doautocmd User Dpp:ext:installer:updateDone"
+      "doautocmd User Dpp:ext:installer:updateDone",
     );
   }
 
