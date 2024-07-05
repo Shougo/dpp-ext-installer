@@ -79,7 +79,7 @@ export class Ext extends BaseExt<Params> {
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
         for (const plugin of plugins) {
-          await this.buildPlugin(args.denops, args.extParams, plugin);
+          await this.#buildPlugin(args.denops, args.extParams, plugin);
         }
       },
     },
@@ -138,7 +138,7 @@ export class Ext extends BaseExt<Params> {
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
         for (const plugin of plugins) {
-          await this.denoCachePlugin(args.denops, args.extParams, plugin);
+          await this.#denoCachePlugin(args.denops, args.extParams, plugin);
         }
       },
     },
@@ -341,7 +341,7 @@ export class Ext extends BaseExt<Params> {
     const erroredPlugins: Plugin[] = [];
     await limitPromiseConcurrency(
       plugins.map((plugin: Plugin, index: number) => async () => {
-        return await this.updatePlugin(
+        return await this.#updatePlugin(
           args,
           updatedPlugins,
           erroredPlugins,
@@ -382,7 +382,7 @@ export class Ext extends BaseExt<Params> {
       }
 
       if (args.extParams.checkDiff) {
-        await this.checkDiff(
+        await this.#checkDiff(
           args.denops,
           args.extParams,
           updated.plugin,
@@ -446,7 +446,7 @@ export class Ext extends BaseExt<Params> {
     );
   }
 
-  async updatePlugin(
+  async #updatePlugin(
     args: {
       denops: Denops;
       options: DppOptions;
@@ -483,7 +483,7 @@ export class Ext extends BaseExt<Params> {
 
       plugin.rev = "";
 
-      await this.revisionLockPlugin(
+      await this.#revisionLockPlugin(
         args.denops,
         args.extParams,
         plugin,
@@ -550,7 +550,7 @@ export class Ext extends BaseExt<Params> {
 
     if (plugin.rev) {
       // Restore revision
-      await this.revisionLockPlugin(
+      await this.#revisionLockPlugin(
         args.denops,
         args.extParams,
         plugin,
@@ -559,19 +559,6 @@ export class Ext extends BaseExt<Params> {
     }
 
     if (updateSuccess) {
-      // Execute "post_update" before "build"
-      if (plugin.hook_post_update) {
-        await args.denops.call(
-          "dpp#ext#installer#_call_hook",
-          "post_update",
-          plugin,
-        );
-      }
-
-      await this.buildPlugin(args.denops, args.extParams, plugin);
-
-      await this.denoCachePlugin(args.denops, args.extParams, plugin);
-
       const newRev = await protocol.protocol.getRevision({
         denops: args.denops,
         plugin,
@@ -579,7 +566,7 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
-      const logMessage = await this.getLogMessage(
+      const logMessage = await this.#getLogMessage(
         args.denops,
         args.extParams,
         plugin,
@@ -589,6 +576,19 @@ export class Ext extends BaseExt<Params> {
       );
 
       if (oldRev.length === 0 || oldRev !== newRev) {
+        // Execute "post_update" before "build"
+        if (plugin.hook_post_update) {
+          await args.denops.call(
+            "dpp#ext#installer#_call_hook",
+            "post_update",
+            plugin,
+          );
+        }
+
+        await this.#buildPlugin(args.denops, args.extParams, plugin);
+
+        await this.#denoCachePlugin(args.denops, args.extParams, plugin);
+
         updatedPlugins.push({
           logMessage,
           oldRev,
@@ -692,7 +692,7 @@ export class Ext extends BaseExt<Params> {
     );
   }
 
-  async getLogMessage(
+  async #getLogMessage(
     denops: Denops,
     extParams: Params,
     plugin: Plugin,
@@ -737,7 +737,7 @@ export class Ext extends BaseExt<Params> {
     return logMessage;
   }
 
-  async buildPlugin(
+  async #buildPlugin(
     denops: Denops,
     extParams: Params,
     plugin: Plugin,
@@ -775,7 +775,7 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
-  async denoCachePlugin(
+  async #denoCachePlugin(
     denops: Denops,
     extParams: Params,
     plugin: Plugin,
@@ -822,7 +822,7 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
-  async revisionLockPlugin(
+  async #revisionLockPlugin(
     denops: Denops,
     extParams: Params,
     plugin: Plugin,
@@ -861,7 +861,7 @@ export class Ext extends BaseExt<Params> {
       }
     }
   }
-  async checkDiff(
+  async #checkDiff(
     denops: Denops,
     extParams: Params,
     plugin: Plugin,
