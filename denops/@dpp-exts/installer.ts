@@ -5,27 +5,29 @@ import {
   Plugin,
   Protocol,
   ProtocolName,
-} from "https://deno.land/x/dpp_vim@v0.2.0/types.ts";
+} from "https://deno.land/x/dpp_vim@v0.3.0/types.ts";
 import {
   autocmd,
   Denops,
   fn,
   op,
   vars,
-} from "https://deno.land/x/dpp_vim@v0.2.0/deps.ts";
+} from "https://deno.land/x/dpp_vim@v0.3.0/deps.ts";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "https://deno.land/x/dpp_vim@v0.2.0/utils.ts";
-import { expandGlob } from "jsr:@std/fs@0.229.1/expand-glob";
+} from "https://deno.land/x/dpp_vim@v0.3.0/utils.ts";
+import { expandGlob } from "jsr:@std/fs@0.229.3/expand-glob";
+import { delay } from "jsr:@std/async@0.224.2/delay";
 
 type Params = {
   checkDiff: boolean;
   githubAPIToken: string;
   logFilePath: string;
   maxProcesses: number;
+  wait: number;
 };
 
 type InstallParams = {
@@ -294,6 +296,7 @@ export class Ext extends BaseExt<Params> {
       githubAPIToken: "",
       logFilePath: "",
       maxProcesses: 5,
+      wait: 0,
     };
   }
 
@@ -341,7 +344,7 @@ export class Ext extends BaseExt<Params> {
     const erroredPlugins: Plugin[] = [];
     await limitPromiseConcurrency(
       plugins.map((plugin: Plugin, index: number) => async () => {
-        return await this.#updatePlugin(
+        await this.#updatePlugin(
           args,
           updatedPlugins,
           erroredPlugins,
@@ -350,6 +353,10 @@ export class Ext extends BaseExt<Params> {
           plugin,
           index + 1,
         );
+
+        if (args.extParams.wait > 0) {
+          await delay(args.extParams.wait);
+        }
       }),
       Math.max(args.extParams.maxProcesses, 1),
     );
@@ -684,7 +691,6 @@ export class Ext extends BaseExt<Params> {
     });
 
     const respJson = (await resp.json()).data;
-    //console.log(baseUpdated);
 
     return plugins.filter((_, index) =>
       respJson[`repo${index}`]?.pushedAt &&

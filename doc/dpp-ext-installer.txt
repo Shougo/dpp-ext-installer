@@ -179,6 +179,7 @@ checkDiff
 githubAPIToken
 		Github API token for
 		|dpp-ext-installer-action-checkNotUpdated|.
+		NOTE: It only work for github plugins.
 
 		Defaults: ""
 
@@ -193,6 +194,13 @@ maxProcesses
 		The max number of processes used for update.
 
 		Defaults: 5
+
+                                                *dpp-ext-installer-param-wait*
+wait
+		The wait time(ms) after one plugin update.
+		It is useful for restricted network environment.
+
+		Defaults: 0
 
 ------------------------------------------------------------------------------
 AUTOCMDS                                          *dpp-ext-installer-autocmds*
