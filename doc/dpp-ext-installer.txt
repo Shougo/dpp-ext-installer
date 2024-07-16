@@ -82,6 +82,10 @@ denoCache
 			{names}:	Plugin names.
 					(Default: [])
 
+                                          *dpp-ext-installer-action-getFailed*
+getFailed
+		Get update failed plugins from previous update.
+
                                             *dpp-ext-installer-action-getLogs*
 getLogs
 		Get all previous logs.
@@ -108,6 +112,10 @@ getNotUpdated
 		params:
 			{names}:	Plugin names.
 					(Default: [])
+
+                                         *dpp-ext-installer-action-getUpdated*
+getUpdated
+		Get updated plugins from previous update.
 
                                       *dpp-ext-installer-action-getUpdateLogs*
 getUpdateLogs

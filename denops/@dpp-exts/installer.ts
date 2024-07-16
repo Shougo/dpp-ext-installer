@@ -51,8 +51,10 @@ type UpdatedPlugin = {
 type Rollbacks = Record<string, string>;
 
 export class Ext extends BaseExt<Params> {
-  #updateLogs: string[] = [];
+  #failedPlugins: Plugin[] = [];
   #logs: string[] = [];
+  #updateLogs: string[] = [];
+  #updatedPlugins: Plugin[] = [];
 
   override async onInit(args: {
     denops: Denops;
@@ -183,6 +185,17 @@ export class Ext extends BaseExt<Params> {
         return plugins;
       },
     },
+    getFailed: {
+      description: "Get failed plugins",
+      callback: (_args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        actionParams: unknown;
+      }) => {
+        return this.#failedPlugins;
+      },
+    },
     getLogs: {
       description: "Get logs",
       callback: (_args: {
@@ -203,6 +216,17 @@ export class Ext extends BaseExt<Params> {
         actionParams: unknown;
       }) => {
         return this.#updateLogs;
+      },
+    },
+    getUpdated: {
+      description: "Get updated plugins",
+      callback: (_args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        actionParams: unknown;
+      }) => {
+        return this.#updatedPlugins;
       },
     },
     install: {
@@ -311,7 +335,9 @@ export class Ext extends BaseExt<Params> {
     plugins: Plugin[],
     revisions: Record<string, string>,
   ) {
+    this.#failedPlugins = [];
     this.#logs = [];
+    this.#updatedPlugins = [];
     this.#updateLogs = [];
 
     if (plugins.length === 0) {
@@ -341,13 +367,13 @@ export class Ext extends BaseExt<Params> {
     );
 
     const updatedPlugins: UpdatedPlugin[] = [];
-    const erroredPlugins: Plugin[] = [];
+    const failedPlugins: Plugin[] = [];
     await limitPromiseConcurrency(
       plugins.map((plugin: Plugin, index: number) => async () => {
         await this.#updatePlugin(
           args,
           updatedPlugins,
-          erroredPlugins,
+          failedPlugins,
           revisions,
           plugins.length,
           plugin,
@@ -428,15 +454,18 @@ export class Ext extends BaseExt<Params> {
       await saveRollbackFile(args.denops, args.protocols);
     }
 
-    if (erroredPlugins.length > 0) {
+    if (failedPlugins.length > 0) {
       await this.#printMessage(
         args.denops,
         args.extParams,
-        "Error plugins:\n" +
-          `${erroredPlugins.map((plugin) => plugin.name).join("\n")}\n` +
+        "Failed plugins:\n" +
+          `${failedPlugins.map((plugin) => plugin.name).join("\n")}\n` +
           "Please read the error message log with the :message command.",
       );
     }
+
+    this.#updatedPlugins = updatedPlugins.map((plugin) => plugin.plugin);
+    this.#failedPlugins = failedPlugins;
 
     await args.denops.call("dpp#ext#installer#_close_progress_window");
 
@@ -462,7 +491,7 @@ export class Ext extends BaseExt<Params> {
       actionParams: unknown;
     },
     updatedPlugins: UpdatedPlugin[],
-    erroredPlugins: Plugin[],
+    failedPlugins: Plugin[],
     revisions: Record<string, string>,
     maxLength: number,
     plugin: Plugin,
@@ -605,7 +634,7 @@ export class Ext extends BaseExt<Params> {
         });
       }
     } else {
-      erroredPlugins.push(plugin);
+      failedPlugins.push(plugin);
     }
   }
 
