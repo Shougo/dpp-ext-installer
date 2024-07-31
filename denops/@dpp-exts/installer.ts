@@ -1,26 +1,25 @@
 import {
   Actions,
   BaseExt,
+  Denops,
   DppOptions,
   Plugin,
   Protocol,
   ProtocolName,
-} from "https://deno.land/x/dpp_vim@v0.3.0/types.ts";
-import {
-  autocmd,
-  Denops,
-  fn,
-  op,
-  vars,
-} from "https://deno.land/x/dpp_vim@v0.3.0/deps.ts";
+} from "jsr:@shougo/dpp-vim@1.0.0/types";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "https://deno.land/x/dpp_vim@v0.3.0/utils.ts";
-import { expandGlob } from "jsr:@std/fs@0.229.3/expand-glob";
-import { delay } from "jsr:@std/async@0.224.2/delay";
+} from "jsr:@shougo/dpp-vim@1.0.0/utils";
+
+import * as autocmd from "jsr:@denops/std@7.0.1/autocmd";
+import * as op from "jsr:@denops/std@7.0.1/option";
+import * as fn from "jsr:@denops/std@7.0.1/function";
+import * as vars from "jsr:@denops/std@7.0.1/variable";
+import { expandGlob } from "jsr:@std/fs@1.0.0/expand-glob";
+import { delay } from "jsr:@std/async@1.0.1/delay";
 
 type Params = {
   checkDiff: boolean;
