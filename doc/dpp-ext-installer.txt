@@ -9,6 +9,7 @@ Introduction		|dpp-ext-installer-introduction|
 Install			|dpp-ext-installer-install|
 Interface		|dpp-ext-installer-interface|
   Actions		  |dpp-ext-installer-actions|
+  Attrs			  |dpp-ext-installer-attrs|
   Params		  |dpp-ext-installer-params|
   Autocmds		  |dpp-ext-installer-autocmds|
 Examples		|dpp-ext-installer-examples|
@@ -172,6 +173,25 @@ update
 					It must be "YYMMDDhhmmss" format or
 					"latest".
 					(Default: "")
+
+------------------------------------------------------------------------------
+ATTRS                                                *dpp-ext-installer-attrs*
+
+                                       *dpp-ext-installer-attr-installerBuild*
+installerBuild  (String)
+		Specify the build script.
+		This command is executed by 'shell' from the plugin
+		runtimepath.
+		NOTE: It must be single command.
+		NOTE: In previous versions of dpp, build could also be of
+		type dictionary, but that is now deprecated.
+		Please use |dpp-plugin-option-hook_post_update| instead.
+
+                                      *dpp-ext-installer-attr-installerFrozen*
+installerFrozen (Bool)
+		If set to v:true, dpp doesn't update it automatically. It is
+		useful for outdated plugins that can no longer be updated.
+		The remote branch for git type.
 
 ------------------------------------------------------------------------------
 PARAMS                                              *dpp-ext-installer-params*

@@ -21,7 +21,7 @@ import * as vars from "jsr:@denops/std@7.0.1/variable";
 import { expandGlob } from "jsr:@std/fs@1.0.0/expand-glob";
 import { delay } from "jsr:@std/async@1.0.1/delay";
 
-type Params = {
+export type Params = {
   checkDiff: boolean;
   githubAPIToken: string;
   logFilePath: string;
@@ -29,12 +29,17 @@ type Params = {
   wait: number;
 };
 
-type InstallParams = {
+export type Attrs = {
+  installerBuild?: string;
+  installerFrozen?: boolean;
+};
+
+export type InstallParams = {
   names?: string[];
   rollback?: string;
 };
 
-type CheckNotUpdatedParams = {
+export type CheckNotUpdatedParams = {
   names?: string[];
   force?: boolean;
 };
@@ -776,14 +781,15 @@ export class Ext extends BaseExt<Params> {
     extParams: Params,
     plugin: Plugin,
   ) {
-    if (!plugin.path || !await isDirectory(plugin.path) || !plugin.build) {
+    const build = (plugin.extAttrs as Attrs)?.installerBuild;
+    if (!plugin.path || !await isDirectory(plugin.path) || !build) {
       return;
     }
 
     const proc = new Deno.Command(
       await op.shell.getGlobal(denops),
       {
-        args: [await op.shellcmdflag.getGlobal(denops), plugin.build],
+        args: [await op.shellcmdflag.getGlobal(denops), build],
         cwd: plugin.path,
         stdout: "piped",
         stderr: "piped",
@@ -1001,7 +1007,7 @@ async function getPlugins(
       denops,
       "dpp#_plugins",
     ),
-  ) as Plugin[]).filter((plugin) => !plugin.local && !plugin.frozen);
+  ) as Plugin[]).filter((plugin) => !plugin.local && !plugin?.extAttrs?.installerFrozen);
 
   if (names.length > 0) {
     plugins = plugins.filter((plugin) => names.indexOf(plugin.name) >= 0);
