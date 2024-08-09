@@ -1,0 +1,23 @@
+{
+  "name": "@shougo/dpp-ext-installer",
+  "version": "0.0.0",
+  "exports": {
+    ".": "./denops/@dpp-exts/installer.ts"
+  },
+  "publish": {
+    "include": [
+      "denops/@dpp-exts/**/*.ts"
+    ]
+  },
+  "imports": {
+  },
+  "lock": false,
+  "tasks": {
+    "check": "deno check denops/**/*.ts",
+    "lint": "deno lint denops",
+    "lint-fix": "deno lint --fix denops",
+    "fmt": "deno fmt denops",
+    "test": "deno test -A --doc --parallel --shuffle denops/**/*.ts",
+    "upgrade": "deno run -A jsr:@molt/cli **/*.ts --write"
+  }
+}
