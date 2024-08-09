@@ -2,7 +2,7 @@
   "name": "@shougo/dpp-ext-installer",
   "version": "0.0.0",
   "exports": {
-    "./": "./denops/@dpp-exts/installer.ts"
+    ".": "./denops/@dpp-exts/installer.ts"
   },
   "publish": {
     "include": [
