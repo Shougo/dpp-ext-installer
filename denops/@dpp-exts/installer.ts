@@ -1007,7 +1007,9 @@ async function getPlugins(
       denops,
       "dpp#_plugins",
     ),
-  ) as Plugin[]).filter((plugin) => !plugin.local && !plugin?.extAttrs?.installerFrozen);
+  ) as Plugin[]).filter((plugin) =>
+    !plugin.local && !(plugin.extAttrs as Attrs)?.installerFrozen
+  );
 
   if (names.length > 0) {
     plugins = plugins.filter((plugin) => names.indexOf(plugin.name) >= 0);
