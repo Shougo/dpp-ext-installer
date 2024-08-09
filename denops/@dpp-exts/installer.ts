@@ -1,11 +1,11 @@
 import {
-  Actions,
+  type Actions,
   BaseExt,
-  Denops,
-  DppOptions,
-  Plugin,
-  Protocol,
-  ProtocolName,
+  type Denops,
+  type DppOptions,
+  type Plugin,
+  type Protocol,
+  type ProtocolName,
 } from "jsr:@shougo/dpp-vim@2.0.0/types";
 import {
   convert2List,
