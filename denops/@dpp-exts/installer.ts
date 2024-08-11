@@ -1,7 +1,6 @@
 import {
   type Actions,
   BaseExt,
-  type Denops,
   type DppOptions,
   type Plugin,
   type Protocol,
@@ -14,6 +13,7 @@ import {
   safeStat,
 } from "jsr:@shougo/dpp-vim@2.0.0/utils";
 
+import type { Denops } from "jsr:@denops/std@~7.0.1";
 import * as autocmd from "jsr:@denops/std@7.0.3/autocmd";
 import * as op from "jsr:@denops/std@7.0.3/option";
 import * as fn from "jsr:@denops/std@7.0.3/function";
