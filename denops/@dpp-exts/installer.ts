@@ -1,17 +1,19 @@
 import {
+  type Action,
   type Actions,
+  type BaseActionParams,
   BaseExt,
   type DppOptions,
   type Plugin,
   type Protocol,
   type ProtocolName,
-} from "jsr:@shougo/dpp-vim@2.0.0/types";
+} from "jsr:@shougo/dpp-vim@2.2.0/types";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@2.0.0/utils";
+} from "jsr:@shougo/dpp-vim@2.2.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.0.1";
 import * as autocmd from "jsr:@denops/std@7.0.3/autocmd";
@@ -54,6 +56,21 @@ type UpdatedPlugin = {
 
 type Rollbacks = Record<string, string>;
 
+export interface ExtActions<Params extends BaseActionParams>
+  extends Actions<Params> {
+  build: Action<Params, void>;
+  checkNotUpdated: Action<Params, void>;
+  denoCache: Action<Params, void>;
+  getNotInstalled: Action<Params, Plugin[]>;
+  getFailed: Action<Params, Plugin[]>;
+  getLogs: Action<Params, string[]>;
+  getUpdateLogs: Action<Params, string[]>;
+  getUpdated: Action<Params, Plugin[]>;
+  install: Action<Params, void>;
+  reinstall: Action<Params, void>;
+  update: Action<Params, void>;
+}
+
 export class Ext extends BaseExt<Params> {
   #failedPlugins: Plugin[] = [];
   #logs: string[] = [];
@@ -72,7 +89,7 @@ export class Ext extends BaseExt<Params> {
     });
   }
 
-  override actions: Actions<Params> = {
+  override actions: ExtActions<Params> = {
     build: {
       description: "Build plugins",
       callback: async (args: {
@@ -262,25 +279,6 @@ export class Ext extends BaseExt<Params> {
         );
       },
     },
-    update: {
-      description: "Update plugins",
-      callback: async (args: {
-        denops: Denops;
-        options: DppOptions;
-        protocols: Record<ProtocolName, Protocol>;
-        extParams: Params;
-        actionParams: unknown;
-      }) => {
-        const params = args.actionParams as InstallParams;
-        const plugins = await getPlugins(args.denops, params.names ?? []);
-
-        const revisions = params.rollback
-          ? await loadRollbackFile(args.denops, params.rollback)
-          : {};
-
-        await this.#updatePlugins(args, plugins, revisions);
-      },
-    },
     reinstall: {
       description: "Reinstall plugins",
       callback: async (args: {
@@ -312,6 +310,25 @@ export class Ext extends BaseExt<Params> {
             await Deno.remove(plugin.path, { recursive: true });
           }
         }
+
+        await this.#updatePlugins(args, plugins, revisions);
+      },
+    },
+    update: {
+      description: "Update plugins",
+      callback: async (args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
+        actionParams: unknown;
+      }) => {
+        const params = args.actionParams as InstallParams;
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+
+        const revisions = params.rollback
+          ? await loadRollbackFile(args.denops, params.rollback)
+          : {};
 
         await this.#updatePlugins(args, plugins, revisions);
       },
