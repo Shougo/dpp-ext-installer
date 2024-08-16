@@ -1,6 +1,5 @@
 import {
   type Action,
-  type Actions,
   type BaseActionParams,
   BaseExt,
   type DppOptions,
@@ -56,8 +55,7 @@ type UpdatedPlugin = {
 
 type Rollbacks = Record<string, string>;
 
-export interface ExtActions<Params extends BaseActionParams>
-  extends Actions<Params> {
+export type ExtActions<Params extends BaseActionParams> = {
   build: Action<Params, void>;
   checkNotUpdated: Action<Params, void>;
   denoCache: Action<Params, void>;
