@@ -60,6 +60,7 @@ export type ExtActions<Params extends BaseActionParams> = {
   checkNotUpdated: Action<Params, void>;
   denoCache: Action<Params, void>;
   getNotInstalled: Action<Params, Plugin[]>;
+  getNotUpdated: Action<Params, Plugin[]>;
   getFailed: Action<Params, Plugin[]>;
   getLogs: Action<Params, string[]>;
   getUpdateLogs: Action<Params, string[]>;
@@ -67,7 +68,7 @@ export type ExtActions<Params extends BaseActionParams> = {
   install: Action<Params, void>;
   reinstall: Action<Params, void>;
   update: Action<Params, void>;
-}
+};
 
 export class Ext extends BaseExt<Params> {
   #failedPlugins: Plugin[] = [];
