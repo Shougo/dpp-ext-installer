@@ -6,21 +6,22 @@ import {
   type Plugin,
   type Protocol,
   type ProtocolName,
-} from "jsr:@shougo/dpp-vim@2.2.0/types";
+} from "jsr:@shougo/dpp-vim@~2.2.0/types";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@2.2.0/utils";
+} from "jsr:@shougo/dpp-vim@~2.2.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.0.1";
-import * as autocmd from "jsr:@denops/std@7.0.3/autocmd";
-import * as op from "jsr:@denops/std@7.0.3/option";
-import * as fn from "jsr:@denops/std@7.0.3/function";
-import * as vars from "jsr:@denops/std@7.0.3/variable";
-import { expandGlob } from "jsr:@std/fs@1.0.1/expand-glob";
-import { delay } from "jsr:@std/async@1.0.3/delay";
+import type { Denops } from "jsr:@denops/std@~7.0.3";
+import * as autocmd from "jsr:@denops/std@~7.0.3/autocmd";
+import * as op from "jsr:@denops/std@~7.0.3/option";
+import * as fn from "jsr:@denops/std@~7.0.3/function";
+import * as vars from "jsr:@denops/std@~7.0.3/variable";
+import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
+import { delay } from "jsr:@std/async@~1.0.3/delay";
+import { Semaphore } from "jsr:@core/asyncutil@~1.0.3/semaphore";
 
 export type Params = {
   checkDiff: boolean;
@@ -60,6 +61,7 @@ export type ExtActions<Params extends BaseActionParams> = {
   checkNotUpdated: Action<Params, void>;
   denoCache: Action<Params, void>;
   getNotInstalled: Action<Params, Plugin[]>;
+  getNotUpdated: Action<Params, Plugin[]>;
   getFailed: Action<Params, Plugin[]>;
   getLogs: Action<Params, string[]>;
   getUpdateLogs: Action<Params, string[]>;
@@ -67,7 +69,7 @@ export type ExtActions<Params extends BaseActionParams> = {
   install: Action<Params, void>;
   reinstall: Action<Params, void>;
   update: Action<Params, void>;
-}
+};
 
 export class Ext extends BaseExt<Params> {
   #failedPlugins: Plugin[] = [];
@@ -387,8 +389,9 @@ export class Ext extends BaseExt<Params> {
 
     const updatedPlugins: UpdatedPlugin[] = [];
     const failedPlugins: Plugin[] = [];
-    await limitPromiseConcurrency(
-      plugins.map((plugin: Plugin, index: number) => async () => {
+    const sem = new Semaphore(args.extParams.maxProcesses);
+    await Promise.all(plugins.map((plugin, index) =>
+      sem.lock(async () => {
         await this.#updatePlugin(
           args,
           updatedPlugins,
@@ -402,9 +405,8 @@ export class Ext extends BaseExt<Params> {
         if (args.extParams.wait > 0) {
           await delay(args.extParams.wait);
         }
-      }),
-      Math.max(args.extParams.maxProcesses, 1),
-    );
+      })
+    ));
 
     const calledDepends: Record<string, boolean> = {};
     for (const updated of updatedPlugins) {
@@ -1111,24 +1113,4 @@ async function loadRollbackFile(
   }
 
   return JSON.parse(await Deno.readTextFile(rollbackFile)) as Rollbacks;
-}
-
-async function limitPromiseConcurrency<T>(
-  funcs: Array<() => Promise<T>>,
-  limit: number,
-): Promise<T[]> {
-  const results: T[] = [];
-  let i = 0;
-
-  const execFunc = async (): Promise<void> => {
-    if (i === funcs.length) return;
-    const func = funcs[i++];
-    results.push(await func());
-    return execFunc();
-  };
-
-  const initialFuncs = funcs.slice(0, limit).map(() => execFunc());
-  await Promise.all(initialFuncs);
-
-  return results;
 }
