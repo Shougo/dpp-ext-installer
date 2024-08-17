@@ -19,6 +19,7 @@ import * as autocmd from "jsr:@denops/std@~7.0.3/autocmd";
 import * as op from "jsr:@denops/std@~7.0.3/option";
 import * as fn from "jsr:@denops/std@~7.0.3/function";
 import * as vars from "jsr:@denops/std@~7.0.3/variable";
+
 import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
 import { delay } from "jsr:@std/async@~1.0.3/delay";
 import { Semaphore } from "jsr:@core/asyncutil@~1.0.3/semaphore";
