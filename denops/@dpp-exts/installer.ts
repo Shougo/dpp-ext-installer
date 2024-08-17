@@ -6,21 +6,21 @@ import {
   type Plugin,
   type Protocol,
   type ProtocolName,
-} from "jsr:@shougo/dpp-vim@2.2.0/types";
+} from "jsr:@shougo/dpp-vim@~2.2.0/types";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@2.2.0/utils";
+} from "jsr:@shougo/dpp-vim@~2.2.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.0.1";
-import * as autocmd from "jsr:@denops/std@7.0.3/autocmd";
-import * as op from "jsr:@denops/std@7.0.3/option";
-import * as fn from "jsr:@denops/std@7.0.3/function";
-import * as vars from "jsr:@denops/std@7.0.3/variable";
-import { expandGlob } from "jsr:@std/fs@1.0.1/expand-glob";
-import { delay } from "jsr:@std/async@1.0.3/delay";
+import type { Denops } from "jsr:@denops/std@~7.0.3";
+import * as autocmd from "jsr:@denops/std@~7.0.3/autocmd";
+import * as op from "jsr:@denops/std@~7.0.3/option";
+import * as fn from "jsr:@denops/std@~7.0.3/function";
+import * as vars from "jsr:@denops/std@~7.0.3/variable";
+import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
+import { delay } from "jsr:@std/async@~1.0.3/delay";
 
 export type Params = {
   checkDiff: boolean;
