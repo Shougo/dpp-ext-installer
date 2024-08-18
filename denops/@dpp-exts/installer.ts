@@ -24,6 +24,7 @@ import * as vars from "jsr:@denops/std@~7.0.3/variable";
 
 import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
 import { delay } from "jsr:@std/async@~1.0.3/delay";
+import { TextLineStream } from "jsr:@std/streams@~1.0.1/text-line-stream";
 import { Semaphore } from "jsr:@core/asyncutil@~1.1.0/semaphore";
 
 export type Params = {
@@ -301,8 +302,9 @@ export class Ext extends BaseExt<Params> {
         const params = args.actionParams as InstallParams;
         if (!params.names || params.names.length === 0) {
           // NOTE: names must be set.
-          await printError(
+          await this.#printError(
             args.denops,
+            args.extParams,
             "names must be set for reinstall plugins.",
           );
           return;
@@ -560,7 +562,7 @@ export class Ext extends BaseExt<Params> {
       plugin.rev = saveRev;
     }
 
-    let commands = await protocol.protocol.getSyncCommands({
+    const commands = await protocol.protocol.getSyncCommands({
       denops: args.denops,
       plugin,
       protocolOptions: protocol.options,
@@ -569,8 +571,8 @@ export class Ext extends BaseExt<Params> {
 
     if (revisions[plugin.name]) {
       // Add rollback commands
-      commands = commands.concat(
-        await protocol.protocol.getRollbackCommands({
+      commands.push(
+        ...await protocol.protocol.getRollbackCommands({
           denops: args.denops,
           plugin,
           protocolOptions: protocol.options,
@@ -583,7 +585,7 @@ export class Ext extends BaseExt<Params> {
     // Execute commands
     let updateSuccess = true;
     for (const command of commands) {
-      const proc = new Deno.Command(
+      const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
@@ -591,24 +593,18 @@ export class Ext extends BaseExt<Params> {
           stdout: "piped",
           stderr: "piped",
         },
+      ).spawn();
+
+      pipeStream(
+        stdout,
+        this.#printProgress.bind(this, args.denops, args.extParams),
+      );
+      pipeStream(
+        stderr,
+        this.#printError.bind(this, args.denops, args.extParams),
       );
 
-      const { stdout, stderr, success } = await proc.output();
-
-      for (
-        const line of new TextDecoder().decode(stdout).split(/\r?\n/)
-          .filter((line) => line.length > 0)
-      ) {
-        await this.#printProgress(args.denops, args.extParams, line);
-      }
-
-      for (
-        const line of new TextDecoder().decode(stderr).split(/\r?\n/)
-          .filter((line) => line.length > 0)
-      ) {
-        await this.#printError(args.denops, args.extParams, line);
-      }
-
+      const { success } = await status;
       if (!success) {
         updateSuccess = false;
         break;
@@ -779,9 +775,9 @@ export class Ext extends BaseExt<Params> {
       oldRev,
     });
 
-    let logMessage = "";
+    const logMessage: string[] = [];
     for (const command of commands) {
-      const proc = new Deno.Command(
+      const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
@@ -789,18 +785,14 @@ export class Ext extends BaseExt<Params> {
           stdout: "piped",
           stderr: "piped",
         },
-      );
+      ).spawn();
 
-      const { stdout, stderr } = await proc.output();
-
-      logMessage += new TextDecoder().decode(stdout);
-
-      for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.#printError(denops, extParams, line);
-      }
+      pipeStream(stdout, (msg) => logMessage.push(msg));
+      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+      await status;
     }
 
-    return logMessage;
+    return logMessage.join("\n");
   }
 
   async #buildPlugin(
@@ -813,7 +805,7 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
-    const proc = new Deno.Command(
+    const { stdout, stderr, status } = new Deno.Command(
       await op.shell.getGlobal(denops),
       {
         args: [await op.shellcmdflag.getGlobal(denops), build],
@@ -821,25 +813,11 @@ export class Ext extends BaseExt<Params> {
         stdout: "piped",
         stderr: "piped",
       },
-    );
+    ).spawn();
 
-    const { stdout, stderr } = await proc.output();
-
-    for (
-      const line of new TextDecoder().decode(stdout).split(/\r?\n/).filter((
-        line,
-      ) => line.length > 0)
-    ) {
-      await this.#printProgress(denops, extParams, line);
-    }
-
-    for (
-      const line of new TextDecoder().decode(stderr).split(/\r?\n/).filter((
-        line,
-      ) => line.length > 0)
-    ) {
-      await this.#printError(denops, extParams, line);
-    }
+    pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
+    pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+    await status;
   }
 
   async #denoCachePlugin(
@@ -854,13 +832,12 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
-    const files = [];
-    for await (const file of expandGlob(`${plugin.path}/denops/**/*.ts`)) {
-      files.push(file.path);
-    }
+    const files = await Array.fromAsync(
+      expandGlob(`${plugin.path}/denops/**/*.ts`),
+    ).then((files) => files.map(({ path }) => path));
 
     // Execute "deno cache" to optimize
-    const proc = new Deno.Command(
+    const { stdout, stderr, status } = new Deno.Command(
       "deno",
       {
         args: ["cache", "--no-check", "--reload"].concat(files),
@@ -868,25 +845,11 @@ export class Ext extends BaseExt<Params> {
         stdout: "piped",
         stderr: "piped",
       },
-    );
+    ).spawn();
 
-    const { stdout, stderr } = await proc.output();
-
-    for (
-      const line of new TextDecoder().decode(stdout).split(/\r?\n/).filter((
-        line,
-      ) => line.length > 0)
-    ) {
-      await this.#printProgress(denops, extParams, line);
-    }
-
-    for (
-      const line of new TextDecoder().decode(stderr).split(/\r?\n/).filter((
-        line,
-      ) => line.length > 0)
-    ) {
-      await this.#printError(denops, extParams, line);
-    }
+    pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
+    pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+    await status;
   }
 
   async #revisionLockPlugin(
@@ -907,7 +870,7 @@ export class Ext extends BaseExt<Params> {
     });
 
     for (const command of commands) {
-      const proc = new Deno.Command(
+      const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
@@ -915,17 +878,11 @@ export class Ext extends BaseExt<Params> {
           stdout: "piped",
           stderr: "piped",
         },
-      );
+      ).spawn();
 
-      const { stdout, stderr } = await proc.output();
-
-      for (const line of new TextDecoder().decode(stdout).split(/\r?\n/)) {
-        await this.#printProgress(denops, extParams, line);
-      }
-
-      for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.#printError(denops, extParams, line);
-      }
+      pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
+      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+      await status;
     }
   }
   async #checkDiff(
@@ -949,8 +906,25 @@ export class Ext extends BaseExt<Params> {
       oldRev,
     });
 
+    const bufname = "dpp-diff";
+    const bufnr = await fn.bufexists(denops, bufname)
+      ? await fn.bufnr(denops, bufname)
+      : await fn.bufadd(denops, bufname);
+
+    if (
+      await fn.bufwinnr(denops, bufnr) < 0 && await fn.bufexists(denops, bufnr)
+    ) {
+      const cmd = await fn.escape(
+        denops,
+        "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable",
+        " ",
+      );
+      await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
+    }
+
     for (const command of commands) {
-      const proc = new Deno.Command(
+      const output: string[] = [];
+      const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
@@ -958,17 +932,11 @@ export class Ext extends BaseExt<Params> {
           stdout: "piped",
           stderr: "piped",
         },
-      );
+      ).spawn();
 
-      const { stdout, stderr } = await proc.output();
-
-      for (const line of new TextDecoder().decode(stdout).split(/\r?\n/)) {
-        await outputCheckDiff(denops, line);
-      }
-
-      for (const line of new TextDecoder().decode(stderr).split(/\r?\n/)) {
-        await this.#printError(denops, extParams, line);
-      }
+      pipeStream(stdout, (msg) => msg && output.push(msg));
+      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+      await status.then(() => fn.appendbufline(denops, bufnr, "$", output));
     }
   }
 
@@ -1045,30 +1013,6 @@ async function getPlugins(
   return plugins;
 }
 
-async function outputCheckDiff(denops: Denops, line: string) {
-  if (line.length === 0) {
-    return;
-  }
-
-  const bufname = "dpp-diff";
-  const bufnr = await fn.bufexists(denops, bufname)
-    ? await fn.bufnr(denops, bufname)
-    : await fn.bufadd(denops, bufname);
-
-  if (
-    await fn.bufwinnr(denops, bufnr) < 0 && await fn.bufexists(denops, bufnr)
-  ) {
-    const cmd = await fn.escape(
-      denops,
-      "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable",
-      " ",
-    );
-    await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
-  }
-
-  await fn.appendbufline(denops, bufnr, "$", line);
-}
-
 async function saveRollbackFile(
   denops: Denops,
   protocols: Record<ProtocolName, Protocol>,
@@ -1123,4 +1067,20 @@ async function loadRollbackFile(
   }
 
   return JSON.parse(await Deno.readTextFile(rollbackFile)) as Rollbacks;
+}
+
+function pipeStream(
+  stream: ReadableStream<Uint8Array>,
+  writer: (msg: string) => unknown | Promise<unknown>,
+) {
+  stream
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(new TextLineStream({ allowCR: true }))
+    .pipeTo(
+      new WritableStream({
+        write: async (chunk) => {
+          await writer(chunk);
+        },
+      }),
+    );
 }
