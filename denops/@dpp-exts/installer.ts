@@ -106,9 +106,12 @@ export class Ext extends BaseExt<Params> {
 
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
-        for (const plugin of plugins) {
-          await this.#buildPlugin(args.denops, args.extParams, plugin);
-        }
+        const sem = new Semaphore(args.extParams.maxProcesses);
+        await Promise.all(plugins.map((plugin) =>
+          sem.lock(async () => {
+            await this.#buildPlugin(args.denops, args.extParams, plugin);
+          })
+        ));
       },
     },
     checkNotUpdated: {
@@ -311,12 +314,12 @@ export class Ext extends BaseExt<Params> {
           ? await loadRollbackFile(args.denops, params.rollback)
           : {};
 
-        for (const plugin of plugins) {
+        await Promise.all(plugins.map(async (plugin) => {
           // Remove plugin directory
           if (plugin.path && await isDirectory(plugin.path)) {
             await Deno.remove(plugin.path, { recursive: true });
           }
-        }
+        }));
 
         await this.#updatePlugins(args, plugins, revisions);
       },
