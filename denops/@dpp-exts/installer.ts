@@ -173,9 +173,7 @@ export class Ext extends BaseExt<Params> {
 
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
-        for (const plugin of plugins) {
-          await this.#denoCachePlugin(args.denops, args.extParams, plugin);
-        }
+        await this.#denoCachePlugins(args.denops, args.extParams, plugins);
       },
     },
     getNotInstalled: {
@@ -420,6 +418,14 @@ export class Ext extends BaseExt<Params> {
       })
     ));
 
+    if (updatedPlugins) {
+      await this.#denoCachePlugins(
+        args.denops,
+        args.extParams,
+        updatedPlugins.map(({ plugin }) => plugin),
+      );
+    }
+
     const calledDepends: Record<string, boolean> = {};
     for (const updated of updatedPlugins) {
       if (updated.plugin.hook_done_update) {
@@ -650,8 +656,6 @@ export class Ext extends BaseExt<Params> {
 
         await this.#buildPlugin(args.denops, args.extParams, plugin);
 
-        await this.#denoCachePlugin(args.denops, args.extParams, plugin);
-
         updatedPlugins.push({
           logMessage,
           oldRev,
@@ -820,28 +824,33 @@ export class Ext extends BaseExt<Params> {
     await status;
   }
 
-  async #denoCachePlugin(
+  async #denoCachePlugins(
     denops: Denops,
     extParams: Params,
-    plugin: Plugin,
+    plugins: Plugin[],
   ) {
-    if (
-      !plugin.path || !await isDirectory(`${plugin.path}/denops`) ||
-      !await fn.executable(denops, "deno")
-    ) {
+    if (!await fn.executable(denops, "deno")) {
       return;
     }
-
-    const files = await Array.fromAsync(
-      expandGlob(`${plugin.path}/denops/**/*.ts`),
-    ).then((files) => files.map(({ path }) => path));
+    const entries = await Promise.all(plugins.map(async (plugin) => {
+      if (!plugin.path || !await isDirectory(`${plugin.path}/denops`)) {
+        return [];
+      }
+      return await Array.fromAsync(
+        expandGlob(`${plugin.path}/denops/**/*.ts`),
+      );
+    }));
+    const files = entries.flatMap((files) => files.map(({ path }) => path));
+    if (!files) {
+      return;
+    }
 
     // Execute "deno cache" to optimize
     const { stdout, stderr, status } = new Deno.Command(
       "deno",
       {
         args: ["cache", "--no-check", "--reload"].concat(files),
-        cwd: plugin.path,
+        env: { NO_COLOR: "1" },
         stdout: "piped",
         stderr: "piped",
       },
