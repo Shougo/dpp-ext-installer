@@ -1,7 +1,15 @@
 function dpp#ext#installer#_print_message(msg) abort
+  const detect_shell = (has('nvim') && nvim_list_uis()->empty())
+          \ || (!has('nvim') && mode(v:true) ==# 'ce')
+
   for mes in s:msg2list(a:msg)
     echomsg '[dpp] ' .. mes
   endfor
+
+  if detect_shell
+    " When it is executed from shell, new line is not added in ":echomsg".
+    echo ''
+  endif
 endfunction
 function s:msg2list(expr) abort
   return a:expr->type() ==# v:t_list ? a:expr : a:expr->split('\n')
