@@ -29,6 +29,7 @@ import { Semaphore } from "jsr:@core/asyncutil@~1.1.0/semaphore";
 
 export type Params = {
   checkDiff: boolean;
+  enableDenoCache: boolean;
   githubAPIToken: string;
   logFilePath: string;
   maxProcesses: number;
@@ -348,6 +349,7 @@ export class Ext extends BaseExt<Params> {
   override params(): Params {
     return {
       checkDiff: false,
+      enableDenoCache: true,
       githubAPIToken: "",
       logFilePath: "",
       maxProcesses: 5,
@@ -418,7 +420,7 @@ export class Ext extends BaseExt<Params> {
       })
     ));
 
-    if (updatedPlugins) {
+    if (args.extParams.enableDenoCache && updatedPlugins) {
       await this.#denoCachePlugins(
         args.denops,
         args.extParams,
