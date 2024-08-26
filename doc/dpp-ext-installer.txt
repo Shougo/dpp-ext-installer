@@ -57,7 +57,8 @@ build
 
                                     *dpp-ext-installer-action-checkNotUpdated*
 checkNotUpdated
-		Check not updated plugins by github GraqhQL API.
+		Check not updated or not installed plugins by github GraqhQL
+		API.
 		https://docs.github.com/en/graphql
 		NOTE: It is available for github plugins only.
 		NOTE: |dpp-ext-installer-param-githubAPIToken| must be set.

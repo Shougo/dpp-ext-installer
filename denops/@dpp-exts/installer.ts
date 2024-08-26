@@ -2,17 +2,19 @@ import {
   type Action,
   type BaseActionParams,
   BaseExt,
+  type Context,
   type DppOptions,
+  type ExtOptions,
   type Plugin,
   type Protocol,
   type ProtocolName,
-} from "jsr:@shougo/dpp-vim@~2.2.0/types";
+} from "jsr:@shougo/dpp-vim@~2.3.0/types";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@~2.2.0/utils";
+} from "jsr:@shougo/dpp-vim@~2.3.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.0.3";
 import * as autocmd from "jsr:@denops/std@~7.0.3/autocmd";
@@ -22,7 +24,7 @@ import * as vars from "jsr:@denops/std@~7.0.3/variable";
 
 import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
 import { delay } from "jsr:@std/async@~1.0.3/delay";
-import { Semaphore } from "jsr:@core/asyncutil@~1.0.3/semaphore";
+import { Semaphore } from "jsr:@core/asyncutil@~1.1.0/semaphore";
 
 export type Params = {
   checkDiff: boolean;
@@ -113,8 +115,10 @@ export class Ext extends BaseExt<Params> {
       description: "Check not updated plugins",
       callback: async (args: {
         denops: Denops;
+        context: Context;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
+        extOptions: ExtOptions;
         extParams: Params;
         actionParams: unknown;
       }) => {
@@ -123,7 +127,9 @@ export class Ext extends BaseExt<Params> {
         const updatedPlugins = (await this.#checkUpdatedPlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
-        )).map((plugin) => plugin.name);
+        )).concat(await this.actions.getNotInstalled.callback(args)).map((
+          plugin,
+        ) => plugin.name);
 
         if (updatedPlugins.length === 0) {
           await this.#printMessage(
