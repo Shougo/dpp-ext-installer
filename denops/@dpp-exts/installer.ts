@@ -917,22 +917,6 @@ export class Ext extends BaseExt<Params> {
       oldRev,
     });
 
-    const bufname = "dpp-diff";
-    const bufnr = await fn.bufexists(denops, bufname)
-      ? await fn.bufnr(denops, bufname)
-      : await fn.bufadd(denops, bufname);
-
-    if (
-      await fn.bufwinnr(denops, bufnr) < 0 && await fn.bufexists(denops, bufnr)
-    ) {
-      const cmd = await fn.escape(
-        denops,
-        "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable",
-        " ",
-      );
-      await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
-    }
-
     for (const command of commands) {
       const output: string[] = [];
       const { stdout, stderr, status } = new Deno.Command(
@@ -947,7 +931,7 @@ export class Ext extends BaseExt<Params> {
 
       pipeStream(stdout, (msg) => msg && output.push(msg));
       pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-      await status.then(() => fn.appendbufline(denops, bufnr, "$", output));
+      await status.then(() => outputCheckDiff(denops, output));
     }
   }
 
@@ -1022,6 +1006,24 @@ async function getPlugins(
   }
 
   return plugins;
+}
+
+async function outputCheckDiff(denops: Denops, output: string[]) {
+  const bufname = "dpp-diff";
+  const bufnr = await fn.bufexists(denops, bufname)
+    ? await fn.bufnr(denops, bufname)
+    : await fn.bufadd(denops, bufname);
+
+  if (
+    await fn.bufwinnr(denops, bufnr) < 0 && await fn.bufexists(denops, bufnr)
+  ) {
+    const cmd =
+      "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable"
+        .replaceAll(" ", "\\ ");
+    await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
+  }
+
+  await fn.appendbufline(denops, bufnr, "$", output);
 }
 
 async function saveRollbackFile(
