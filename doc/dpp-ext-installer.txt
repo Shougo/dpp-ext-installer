@@ -78,7 +78,8 @@ checkNotUpdated
 denoCache
 		Execute "deno cache --reload" for plugins.
 		NOTE: "deno" command is required.
-		NOTE: It is also executed when plugins are installed/updated.
+		NOTE: It is also executed when plugins are installed/updated
+		if |dpp-ext-installer-param-enableDenoCache| is v:true.
 
 		params:
 			{names}:	Plugin names.
@@ -203,6 +204,13 @@ checkDiff
 		NOTE: It outputs the diff to new buffer in the background.
 
 		Defaults: v:false
+
+                                     *dpp-ext-installer-param-enableDenoCache*
+enableDenoCache
+		Enable executing "deno cache --reload" for plugins on
+		installation/update.
+
+		Defaults: v:true
 
                                       *dpp-ext-installer-param-githubAPIToken*
 githubAPIToken
