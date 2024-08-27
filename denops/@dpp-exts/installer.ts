@@ -843,7 +843,7 @@ export class Ext extends BaseExt<Params> {
       );
     }));
     const files = entries.flatMap((files) => files.map(({ path }) => path));
-    if (!files) {
+    if (!files.length) {
       return;
     }
 
