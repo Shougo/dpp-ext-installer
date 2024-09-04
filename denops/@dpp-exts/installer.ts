@@ -1009,6 +1009,10 @@ async function getPlugins(
 }
 
 async function outputCheckDiff(denops: Denops, output: string[]) {
+  if (output.length === 0) {
+    return;
+  }
+
   const bufname = "dpp-diff";
   const bufnr = await fn.bufexists(denops, bufname)
     ? await fn.bufnr(denops, bufname)
