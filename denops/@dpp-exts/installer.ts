@@ -1,26 +1,25 @@
 import {
-  type Action,
-  type BaseActionParams,
-  BaseExt,
+  type BaseParams,
   type Context,
   type DppOptions,
   type ExtOptions,
   type Plugin,
-  type Protocol,
   type ProtocolName,
-} from "jsr:@shougo/dpp-vim@~2.3.0/types";
+} from "jsr:@shougo/dpp-vim@~3.0.0/types";
+import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~3.0.0/ext";
+import { type Protocol } from "jsr:@shougo/dpp-vim@~3.0.0/protocol";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@~2.3.0/utils";
+} from "jsr:@shougo/dpp-vim@~3.0.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.0.3";
-import * as autocmd from "jsr:@denops/std@~7.0.3/autocmd";
-import * as op from "jsr:@denops/std@~7.0.3/option";
-import * as fn from "jsr:@denops/std@~7.0.3/function";
-import * as vars from "jsr:@denops/std@~7.0.3/variable";
+import type { Denops } from "jsr:@denops/std@~7.1.0";
+import * as autocmd from "jsr:@denops/std@~7.1.0/autocmd";
+import * as op from "jsr:@denops/std@~7.1.0/option";
+import * as fn from "jsr:@denops/std@~7.1.0/function";
+import * as vars from "jsr:@denops/std@~7.1.0/variable";
 
 import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
 import { delay } from "jsr:@std/async@~1.0.3/delay";
@@ -61,7 +60,7 @@ type UpdatedPlugin = {
 
 type Rollbacks = Record<string, string>;
 
-export type ExtActions<Params extends BaseActionParams> = {
+export type ExtActions<Params extends BaseParams> = {
   build: Action<Params, void>;
   checkNotUpdated: Action<Params, void>;
   denoCache: Action<Params, void>;
@@ -102,7 +101,7 @@ export class Ext extends BaseExt<Params> {
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
 
@@ -125,7 +124,7 @@ export class Ext extends BaseExt<Params> {
         protocols: Record<ProtocolName, Protocol>;
         extOptions: ExtOptions;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as CheckNotUpdatedParams;
 
@@ -168,7 +167,7 @@ export class Ext extends BaseExt<Params> {
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
 
@@ -184,7 +183,7 @@ export class Ext extends BaseExt<Params> {
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
         const plugins = await getPlugins(args.denops, params.names ?? []);
@@ -205,7 +204,7 @@ export class Ext extends BaseExt<Params> {
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
         const plugins = await this.#checkUpdatedPlugins(
@@ -222,7 +221,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         return this.#failedPlugins;
       },
@@ -233,7 +232,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         return this.#logs;
       },
@@ -244,7 +243,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         return this.#updateLogs;
       },
@@ -255,7 +254,7 @@ export class Ext extends BaseExt<Params> {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         return this.#updatedPlugins;
       },
@@ -267,7 +266,7 @@ export class Ext extends BaseExt<Params> {
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
         const plugins = await getPlugins(args.denops, params.names ?? []);
@@ -296,7 +295,7 @@ export class Ext extends BaseExt<Params> {
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
         if (!params.names || params.names.length === 0) {
@@ -332,7 +331,7 @@ export class Ext extends BaseExt<Params> {
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
         extParams: Params;
-        actionParams: unknown;
+        actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
         const plugins = await getPlugins(args.denops, params.names ?? []);
@@ -363,7 +362,7 @@ export class Ext extends BaseExt<Params> {
       options: DppOptions;
       protocols: Record<ProtocolName, Protocol>;
       extParams: Params;
-      actionParams: unknown;
+      actionParams: BaseParams;
     },
     plugins: Plugin[],
     revisions: Record<string, string>,
@@ -529,7 +528,7 @@ export class Ext extends BaseExt<Params> {
       options: DppOptions;
       protocols: Record<ProtocolName, Protocol>;
       extParams: Params;
-      actionParams: unknown;
+      actionParams: BaseParams;
     },
     updatedPlugins: UpdatedPlugin[],
     failedPlugins: Plugin[],
