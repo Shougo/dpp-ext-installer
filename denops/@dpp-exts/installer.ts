@@ -1,13 +1,13 @@
-import {
-  type BaseParams,
-  type Context,
-  type DppOptions,
-  type ExtOptions,
-  type Plugin,
-  type ProtocolName,
+import type {
+  BaseParams,
+  Context,
+  DppOptions,
+  ExtOptions,
+  Plugin,
+  ProtocolName,
 } from "jsr:@shougo/dpp-vim@~3.0.0/types";
 import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~3.0.0/ext";
-import { type Protocol } from "jsr:@shougo/dpp-vim@~3.0.0/protocol";
+import type { Protocol } from "jsr:@shougo/dpp-vim@~3.0.0/protocol";
 import {
   convert2List,
   isDirectory,
