@@ -1,13 +1,13 @@
-import {
-  type BaseParams,
-  type Context,
-  type DppOptions,
-  type ExtOptions,
-  type Plugin,
-  type ProtocolName,
+import type {
+  BaseParams,
+  Context,
+  DppOptions,
+  ExtOptions,
+  Plugin,
+  ProtocolName,
 } from "jsr:@shougo/dpp-vim@~3.0.0/types";
 import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~3.0.0/ext";
-import { type Protocol } from "jsr:@shougo/dpp-vim@~3.0.0/protocol";
+import type { Protocol } from "jsr:@shougo/dpp-vim@~3.0.0/protocol";
 import {
   convert2List,
   isDirectory,
@@ -716,24 +716,16 @@ export class Ext extends BaseExt<Params> {
     }
 
     // Create query string.
-    const queries = [];
-    for (const [index, plugin] of plugins.entries()) {
-      if (!plugin.repo) {
-        continue;
-      }
-      const pluginNames = plugin.repo.split(/\//);
-      if (pluginNames.length !== 2) {
-        // Invalid repository name
-        continue;
-      }
-
-      // NOTE: "repository" API is faster than "search" API
-      queries.push(
-        `repo${index}: repository(owner:"${
-          pluginNames.slice(-2, -1)
-        }", name: "${pluginNames.slice(-1)}"){ pushedAt }`,
-      );
-    }
+    const query = "query {\n" +
+      [...plugins.entries()].flatMap(([index, plugin]) => {
+        if (!plugin.repo) return [];
+        const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
+        if (!owner || !name) return [];
+        // NOTE: "repository" API is faster than "search" API
+        return [
+          `repo${index}: repository(owner:"${owner}", name:"${name}"){ pushedAt }`,
+        ];
+      }).join("\n") + "\n}";
 
     // POST github API
     const resp = await fetch("https://api.github.com/graphql", {
@@ -742,20 +734,34 @@ export class Ext extends BaseExt<Params> {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${args.extParams.githubAPIToken}`,
       },
-      body: JSON.stringify({
-        query: `
-          query {
-            ${queries.join("\n")}
-          }
-        `,
-      }),
+      body: JSON.stringify({ query }),
     });
 
-    const respJson = (await resp.json()).data;
+    if (!resp.ok) {
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        `Failed to fetch from GitHub GraphQL API: ${resp.statusText}`,
+      );
+      return [];
+    }
+
+    const result = await resp.json() as
+      | { data: Record<string, { pushedAt: string }> }
+      | { errors: { message: string }[] };
+
+    if ("errors" in result) {
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        `Failed to fetch from GitHub GraphQL API: ${result.errors[0].message}`,
+      );
+      return [];
+    }
 
     return plugins.filter((_, index) =>
-      respJson[`repo${index}`]?.pushedAt &&
-      new Date(respJson[`repo${index}`].pushedAt) > baseUpdated
+      result.data[`repo${index}`]?.pushedAt &&
+      new Date(result.data[`repo${index}`].pushedAt) > baseUpdated
     );
   }
 
@@ -1099,4 +1105,18 @@ function pipeStream(
         },
       }),
     );
+}
+
+function extractGitHubRepo(repo: string): [string, string] | undefined {
+  if (repo.startsWith("https://github.com/")) {
+    const [owner, name] = repo.slice(19).split("/");
+    return [owner, name];
+  } else if (repo.startsWith("github.com/")) {
+    const [owner, name] = repo.slice(11).split("/");
+    return [owner, name];
+  }
+  const splitted = repo.split("/");
+  if (splitted.length === 2) {
+    return splitted as [string, string];
+  }
 }

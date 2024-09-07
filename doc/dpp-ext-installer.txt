@@ -57,15 +57,14 @@ build
 
                                     *dpp-ext-installer-action-checkNotUpdated*
 checkNotUpdated
-		Check not updated or not installed plugins by github GraqhQL
-		API.
-		https://docs.github.com/en/graphql
-		NOTE: It is available for github plugins only.
+		Check not updated or not installed plugins by GitHub GraqhQL
+		API. (https://docs.github.com/en/graphql)
+		It does not return value but prompts whether update.
+		NOTE: It is available for GitHub plugins only.
 		NOTE: |dpp-ext-installer-param-githubAPIToken| must be set.
-		NOTE: It does not return value.
 		NOTE: The update check is quicker than
 		|dpp-ext-installer-action-update| but it is not perfect
-		solution. github API cannot detect upstream changes
+		solution. GitHub API cannot detect upstream changes
 		immediately.
 
 		params:
@@ -103,13 +102,13 @@ getNotInstalled
 
                                       *dpp-ext-installer-action-getNotUpdated*
 getNotUpdated
-		Get not updated plugins by github GraqhQL API.
+		Get not updated plugins by GitHub GraqhQL API.
 		https://docs.github.com/en/graphql.
-		NOTE: It is available for github plugins only.
+		NOTE: It is available for GitHub plugins only.
 		NOTE: |dpp-ext-installer-param-githubAPIToken| must be set.
 		NOTE: The update check is quicker than
 		|dpp-ext-installer-action-update| but it is not perfect
-		solution. github API cannot detect upstream changes
+		solution. GitHub API cannot detect upstream changes
 		immediately.
 
 		params:
@@ -214,9 +213,9 @@ enableDenoCache
 
                                       *dpp-ext-installer-param-githubAPIToken*
 githubAPIToken
-		Github API token for
-		|dpp-ext-installer-action-checkNotUpdated|.
-		NOTE: It only work for github plugins.
+		GitHub API token used for
+		|dpp-ext-installer-action-checkNotUpdated| and
+		|dpp-ext-installer-action-getNotUpdated|.
 
 		Defaults: ""
 
