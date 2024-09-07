@@ -1109,14 +1109,25 @@ function pipeStream(
 
 function extractGitHubRepo(repo: string): [string, string] | undefined {
   if (repo.startsWith("https://github.com/")) {
+    // https://github.com/ style
     const [owner, name] = repo.slice(19).split("/");
-    return [owner, name];
+    return [owner, name.replace(/\.git$/, "")];
   } else if (repo.startsWith("github.com/")) {
+    // github.com/ style
     const [owner, name] = repo.slice(11).split("/");
-    return [owner, name];
+    return [owner, name.replace(/\.git$/, "")];
+  } else if (repo.startsWith("git@github.com:")) {
+    // git@github.com: style
+    const [owner, name] = repo.slice(15).split("/");
+    return [owner, name.replace(/\.git$/, "")];
   }
+
   const splitted = repo.split("/");
   if (splitted.length === 2) {
-    return splitted as [string, string];
+    // owner/name style
+    const [owner, name] = splitted;
+    return [owner, name.replace(/\.git$/, "")];
   }
+
+  return undefined;
 }
