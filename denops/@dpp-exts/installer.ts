@@ -15,16 +15,16 @@ import {
   safeStat,
 } from "jsr:@shougo/dpp-vim@~3.0.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.1.0";
-import * as autocmd from "jsr:@denops/std@~7.1.0/autocmd";
-import * as op from "jsr:@denops/std@~7.1.0/option";
-import * as fn from "jsr:@denops/std@~7.1.0/function";
-import * as vars from "jsr:@denops/std@~7.1.0/variable";
+import type { Denops } from "jsr:@denops/std@~7.2.0";
+import * as autocmd from "jsr:@denops/std@~7.2.0/autocmd";
+import * as op from "jsr:@denops/std@~7.2.0/option";
+import * as fn from "jsr:@denops/std@~7.2.0/function";
+import * as vars from "jsr:@denops/std@~7.2.0/variable";
 
 import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
 import { delay } from "jsr:@std/async@~1.0.3/delay";
 import { TextLineStream } from "jsr:@std/streams@~1.0.1/text-line-stream";
-import { Semaphore } from "jsr:@core/asyncutil@~1.1.0/semaphore";
+import { Semaphore } from "jsr:@core/asyncutil@~1.2.0/semaphore";
 
 export type Params = {
   checkDiff: boolean;
@@ -87,7 +87,7 @@ export class Ext extends BaseExt<Params> {
     await autocmd.group(args.denops, "dpp", (helper: autocmd.GroupHelper) => {
       helper.define(
         "User",
-        "dpp:ext:installer:updateDone",
+        "Dpp:ext:installer:updateDone",
         ":",
       );
     });
