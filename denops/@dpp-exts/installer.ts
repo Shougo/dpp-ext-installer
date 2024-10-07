@@ -145,15 +145,20 @@ export class Ext extends BaseExt<Params> {
         }
 
         const force = params.force ?? false;
-        if (
-          !force && await fn.confirm(
+        if (!force) {
+          const updatedText = (updatedPlugins.length > 10)
+            ? updatedPlugins.slice(0, 10).join("\n") + "\n..."
+            : updatedPlugins.join("\n");
+          if (
+            await fn.confirm(
               args.denops,
-              `Updated plugins:\n${updatedPlugins.join("\n")}\n\nUpdate now?`,
+              `Updated plugins:\n${updatedText}\n\nUpdate now?`,
               "yes\nNo",
               2,
             ) !== 1
-        ) {
-          return;
+          ) {
+            return;
+          }
         }
 
         const plugins = await getPlugins(args.denops, updatedPlugins);
