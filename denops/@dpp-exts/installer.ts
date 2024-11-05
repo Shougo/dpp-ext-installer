@@ -15,11 +15,11 @@ import {
   safeStat,
 } from "jsr:@shougo/dpp-vim@~3.0.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.2.0";
-import * as autocmd from "jsr:@denops/std@~7.2.0/autocmd";
-import * as op from "jsr:@denops/std@~7.2.0/option";
-import * as fn from "jsr:@denops/std@~7.2.0/function";
-import * as vars from "jsr:@denops/std@~7.2.0/variable";
+import type { Denops } from "jsr:@denops/std@~7.3.0";
+import * as autocmd from "jsr:@denops/std@~7.3.0/autocmd";
+import * as op from "jsr:@denops/std@~7.3.0/option";
+import * as fn from "jsr:@denops/std@~7.3.0/function";
+import * as vars from "jsr:@denops/std@~7.3.0/variable";
 
 import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
 import { delay } from "jsr:@std/async@~1.0.3/delay";
@@ -504,7 +504,8 @@ export class Ext extends BaseExt<Params> {
           args.extParams,
           "Breaking updated plugins:\n" +
             `${
-              breakingPlugins.map((updated) => updated.plugin.name).join("\n")
+              breakingPlugins.map((updated) => "    " + updated.plugin.name)
+                .join("\n")
             }`,
         );
       }
