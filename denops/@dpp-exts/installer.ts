@@ -56,6 +56,7 @@ type UpdatedPlugin = {
   oldRev: string;
   plugin: Plugin;
   protocol: Protocol;
+  url: string;
 };
 
 type Rollbacks = Record<string, string>;
@@ -472,11 +473,23 @@ export class Ext extends BaseExt<Params> {
     }
 
     if (updatedPlugins.length > 0) {
+      const formatPlugin = (updated: UpdatedPlugin): string => {
+        const compareLink =
+          updated.oldRev !== "" && /^https?:\/\/github.com\//.test(updated.url)
+            ? `\n    ${
+              updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
+            }/compare/${updated.oldRev}...${updated.newRev}`
+            : "";
+        return `  ${updated.plugin.name}${compareLink}`;
+      };
+
       await this.#printMessage(
         args.denops,
         args.extParams,
         "Updated plugins:\n" +
-          `${updatedPlugins.map((updated) => updated.plugin.name).join("\n")}`,
+          `${
+            updatedPlugins.map((updated) => formatPlugin(updated)).join("\n")
+          }`,
       );
 
       // If it has breaking changes commit message
@@ -662,12 +675,20 @@ export class Ext extends BaseExt<Params> {
 
         await this.#buildPlugin(args.denops, args.extParams, plugin);
 
+        const url = await protocol.protocol.getUrl({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+        });
+
         updatedPlugins.push({
           logMessage,
           oldRev,
           newRev,
           plugin,
           protocol,
+          url,
         });
       }
     } else {
