@@ -480,7 +480,11 @@ export class Ext extends BaseExt<Params> {
               updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
             }/compare/${updated.oldRev}...${updated.newRev}`
             : "";
-        return `  ${updated.plugin.name}${compareLink}`;
+        const commitCount = updated.logMessage.length;
+        const changes = commitCount === 0
+          ? ""
+          : `(${commitCount} change${commitCount === 1 ? "" : "s"})`;
+        return `  ${updated.plugin.name}${changes}${compareLink}`;
       };
 
       await this.#printMessage(
