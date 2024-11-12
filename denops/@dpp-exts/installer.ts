@@ -5,15 +5,15 @@ import type {
   ExtOptions,
   Plugin,
   ProtocolName,
-} from "jsr:@shougo/dpp-vim@~3.0.0/types";
-import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~3.0.0/ext";
-import type { Protocol } from "jsr:@shougo/dpp-vim@~3.0.0/protocol";
+} from "jsr:@shougo/dpp-vim@~3.1.0/types";
+import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~3.1.0/ext";
+import type { Protocol } from "jsr:@shougo/dpp-vim@~3.1.0/protocol";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@~3.0.0/utils";
+} from "jsr:@shougo/dpp-vim@~3.1.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.3.0";
 import * as autocmd from "jsr:@denops/std@~7.3.0/autocmd";
@@ -51,12 +51,13 @@ export type CheckNotUpdatedParams = {
 };
 
 type UpdatedPlugin = {
-  logMessage: string;
-  newRev: string;
-  oldRev: string;
   plugin: Plugin;
   protocol: Protocol;
+  newRev: string;
+  oldRev: string;
   url: string;
+  logMessage: string;
+  changesCount: number;
 };
 
 type Rollbacks = Record<string, string>;
@@ -480,10 +481,9 @@ export class Ext extends BaseExt<Params> {
               updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
             }/compare/${updated.oldRev}...${updated.newRev}`
             : "";
-        const commitCount = updated.logMessage.length;
-        const changes = commitCount === 0
+        const changes = updated.changesCount === 0
           ? ""
-          : `(${commitCount} change${commitCount === 1 ? "" : "s"})`;
+          : `(${updated.changesCount} change${updated.changesCount === 1 ? "" : "s"})`;
         return `  ${updated.plugin.name}${changes}${compareLink}`;
       };
 
@@ -668,6 +668,15 @@ export class Ext extends BaseExt<Params> {
         newRev,
       );
 
+      const changesCount = await this.#getChangesCount(
+        args.denops,
+        args.extParams,
+        plugin,
+        protocol,
+        oldRev,
+        newRev,
+      );
+
       if (oldRev.length === 0 || oldRev !== newRev) {
         // Execute "post_update" before "build"
         if (plugin.hook_post_update) {
@@ -688,12 +697,13 @@ export class Ext extends BaseExt<Params> {
         });
 
         updatedPlugins.push({
-          logMessage,
-          oldRev,
-          newRev,
           plugin,
           protocol,
+          oldRev,
+          newRev,
           url,
+          logMessage,
+          changesCount,
         });
       }
     } else {
@@ -829,12 +839,53 @@ export class Ext extends BaseExt<Params> {
         },
       ).spawn();
 
-      pipeStream(stdout, (msg) => logMessage.push(msg));
-      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+      await pipeStream(stdout, (msg) => logMessage.push(msg));
+      await pipeStream(stderr, this.#printError.bind(this, denops, extParams));
       await status;
     }
 
     return logMessage.join("\n");
+  }
+
+  async #getChangesCount(
+    denops: Denops,
+    extParams: Params,
+    plugin: Plugin,
+    protocol: Protocol,
+    oldRev: string,
+    newRev: string,
+  ): Promise<number> {
+    if (newRev === oldRev || newRev.length === 0 || oldRev.length === 0) {
+      return 0;
+    }
+
+    const commands = await protocol.protocol.getChangesCountCommands({
+      denops: denops,
+      plugin,
+      protocolOptions: protocol.options,
+      protocolParams: protocol.params,
+      newRev,
+      oldRev,
+    });
+
+    let changesCount = 0;
+    for (const command of commands) {
+      const { stdout, stderr, status } = new Deno.Command(
+        command.command,
+        {
+          args: command.args,
+          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          stdout: "piped",
+          stderr: "piped",
+        },
+      ).spawn();
+
+      await pipeStream(stdout, (msg) => changesCount = parseInt(msg, 10));
+      await pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+      await status;
+    }
+
+    return changesCount;
   }
 
   async #buildPlugin(
@@ -1125,8 +1176,8 @@ async function loadRollbackFile(
 function pipeStream(
   stream: ReadableStream<Uint8Array>,
   writer: (msg: string) => unknown | Promise<unknown>,
-) {
-  stream
+): Promise<void> {
+  return stream
     .pipeThrough(new TextDecoderStream())
     .pipeThrough(new TextLineStream({ allowCR: true }))
     .pipeTo(
