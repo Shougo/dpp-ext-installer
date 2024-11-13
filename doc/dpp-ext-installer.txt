@@ -87,14 +87,17 @@ denoCache
                                           *dpp-ext-installer-action-getFailed*
 getFailed
 		Get update failed plugins from previous update.
+		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
                                             *dpp-ext-installer-action-getLogs*
 getLogs
 		Get all previous logs.
+		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
                                     *dpp-ext-installer-action-getNotInstalled*
 getNotInstalled
 		Get not installed plugins.
+		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
 		params:
 			{names}:	Plugin names.
@@ -110,6 +113,7 @@ getNotUpdated
 		|dpp-ext-installer-action-update| but it is not perfect
 		solution. GitHub API cannot detect upstream changes
 		immediately.
+		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
 		params:
 			{names}:	Plugin names.
@@ -118,10 +122,12 @@ getNotUpdated
                                          *dpp-ext-installer-action-getUpdated*
 getUpdated
 		Get updated plugins from previous update.
+		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
                                       *dpp-ext-installer-action-getUpdateLogs*
 getUpdateLogs
 		Get all previous update logs.
+		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
                                             *dpp-ext-installer-action-install*
 install
