@@ -483,7 +483,9 @@ export class Ext extends BaseExt<Params> {
             : "";
         const changes = updated.changesCount === 0
           ? ""
-          : `(${updated.changesCount} change${updated.changesCount === 1 ? "" : "s"})`;
+          : `(${updated.changesCount} change${
+            updated.changesCount === 1 ? "" : "s"
+          })`;
         return `  ${updated.plugin.name}${changes}${compareLink}`;
       };
 
