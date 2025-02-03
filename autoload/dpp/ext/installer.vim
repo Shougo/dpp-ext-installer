@@ -50,7 +50,7 @@ function s:new_progress_window() abort
   const winheight = 20
 
   if has('nvim')
-    const winid = nvim_open_win(nvim_create_buf(v:false, v:true), v:true, #{
+    const winid = nvim_open_win(nvim_create_buf(v:false, v:true), v:false, #{
           \   relative: 'editor',
           \   row: winrow,
           \   col: wincol,

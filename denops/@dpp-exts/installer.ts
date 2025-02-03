@@ -985,6 +985,7 @@ export class Ext extends BaseExt<Params> {
       await status;
     }
   }
+
   async #checkDiff(
     denops: Denops,
     extParams: Params,
