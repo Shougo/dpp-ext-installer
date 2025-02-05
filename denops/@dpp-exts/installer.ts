@@ -536,6 +536,9 @@ export class Ext extends BaseExt<Params> {
 
     await args.denops.call("dpp#make_state");
 
+    // NOTE: "redraw" is needed to close popup window
+    await args.denops.cmd("redraw");
+
     await this.#printMessage(
       args.denops,
       args.extParams,
