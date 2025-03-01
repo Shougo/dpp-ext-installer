@@ -133,8 +133,8 @@ getUpdateLogs
 install
 		Install plugins.
 
-		NOTE: The rollback file is saved under
-		"{base-path}/{name}/{YYMMDDhhmmss}" directory.
+		NOTE: The rollback file("rollback.json") is saved under
+		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}" directory.
 
 		params:
 			{names}:	Plugin names.
@@ -148,8 +148,8 @@ install
 reinstall
 		Reinstall plugins.
 
-		NOTE: The rollback file is saved under
-		"{base-path}/{name}/{YYMMDDhhmmss}" directory.
+		NOTE: The rollback file("rollback.json") is saved under
+		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}" directory.
 
 		params:
 			{names}:	Plugin names.
@@ -163,8 +163,8 @@ reinstall
 update
 		Update plugins.
 
-		NOTE: The rollback file is saved under
-		"{base-path}/{name}/{YYMMDDhhmmss}" directory.
+		NOTE: The rollback file("rollback.json") is saved under
+		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}" directory.
 
 		params:
 			{names}:	Plugin names.
@@ -286,6 +286,9 @@ FAQ 3:                                               |dpp-ext-installer-faq-3|
 FAQ 4:                                               |dpp-ext-installer-faq-4|
 	I want to get not updated plugins by Ddu.
 
+FAQ 5:                                               |dpp-ext-installer-faq-5|
+	I want to use lockfile system.
+
 ------------------------------------------------------------------------------
                                                      *dpp-ext-installer-faq-1*
 Q: The installation/update is slow.
@@ -331,6 +334,12 @@ A: >
 	    \     },
 	    \   ],
 	    \ })
+
+                                                     *dpp-ext-installer-faq-5*
+Q: I want to use lockfile system.
+
+A: You can use "rollback" param when |dpp-ext-installer-action-install| or
+|dpp-ext-installer-action-update|.
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
