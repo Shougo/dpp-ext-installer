@@ -1118,10 +1118,15 @@ async function outputCheckDiff(denops: Denops, output: string[]) {
   if (
     await fn.bufwinnr(denops, bufnr) < 0 && await fn.bufexists(denops, bufnr)
   ) {
+    const winId = await fn.win_getid(denops);
+
     const cmd =
       "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable"
         .replaceAll(" ", "\\ ");
     await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
+
+    // Restore the cursor
+    await fn.win_gotoid(denops, winId);
   }
 
   await fn.appendbufline(denops, bufnr, "$", output);
