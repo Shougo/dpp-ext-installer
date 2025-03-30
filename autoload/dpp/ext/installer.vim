@@ -51,6 +51,7 @@ function s:new_progress_window() abort
 
   if has('nvim')
     const winid = nvim_open_win(nvim_create_buf(v:false, v:true), v:false, #{
+          \   border: 'none',
           \   relative: 'editor',
           \   row: winrow,
           \   col: wincol,

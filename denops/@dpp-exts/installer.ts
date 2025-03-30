@@ -5,15 +5,15 @@ import type {
   ExtOptions,
   Plugin,
   ProtocolName,
-} from "jsr:@shougo/dpp-vim@~4.1.0/types";
-import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~4.1.0/ext";
-import type { Protocol } from "jsr:@shougo/dpp-vim@~4.1.0/protocol";
+} from "jsr:@shougo/dpp-vim@~4.2.0/types";
+import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~4.2.0/ext";
+import type { Protocol } from "jsr:@shougo/dpp-vim@~4.2.0/protocol";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@~4.1.0/utils";
+} from "jsr:@shougo/dpp-vim@~4.2.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.5.0";
 import * as autocmd from "jsr:@denops/std@~7.5.0/autocmd";
