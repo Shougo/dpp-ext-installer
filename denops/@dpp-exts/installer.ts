@@ -16,6 +16,7 @@ import {
 } from "jsr:@shougo/dpp-vim@~4.2.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.5.0";
+import { batch } from "jsr:@denops/std@~7.5.0/batch";
 import * as autocmd from "jsr:@denops/std@~7.5.0/autocmd";
 import * as op from "jsr:@denops/std@~7.5.0/option";
 import * as fn from "jsr:@denops/std@~7.5.0/function";
@@ -1129,7 +1130,11 @@ async function outputCheckDiff(denops: Denops, output: string[]) {
     await fn.win_gotoid(denops, winId);
   }
 
-  await fn.appendbufline(denops, bufnr, "$", output);
+  await batch(denops, async (denops: Denops) => {
+    await op.modifiable.setLocal(denops, true);
+    await fn.appendbufline(denops, bufnr, "$", output);
+    await op.modifiable.setLocal(denops, false);
+  });
 }
 
 async function saveRollbackFile(
