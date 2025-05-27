@@ -1131,9 +1131,9 @@ async function outputCheckDiff(denops: Denops, output: string[]) {
   }
 
   await batch(denops, async (denops: Denops) => {
-    await op.modifiable.setLocal(denops, true);
+    await fn.setbufvar(denops, bufnr, "&modifiable", true);
     await fn.appendbufline(denops, bufnr, "$", output);
-    await op.modifiable.setLocal(denops, false);
+    await fn.setbufvar(denops, bufnr, "&modifiable", false);
   });
 }
 
