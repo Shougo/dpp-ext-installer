@@ -5,15 +5,15 @@ import type {
   ExtOptions,
   Plugin,
   ProtocolName,
-} from "jsr:@shougo/dpp-vim@~4.2.0/types";
-import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~4.2.0/ext";
-import type { Protocol } from "jsr:@shougo/dpp-vim@~4.2.0/protocol";
+} from "jsr:@shougo/dpp-vim@~4.3.0/types";
+import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~4.3.0/ext";
+import type { Protocol } from "jsr:@shougo/dpp-vim@~4.3.0/protocol";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@~4.2.0/utils";
+} from "jsr:@shougo/dpp-vim@~4.3.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.5.0";
 import { batch } from "jsr:@denops/std@~7.5.0/batch";
@@ -1038,6 +1038,12 @@ export class Ext extends BaseExt<Params> {
     protocolParams: Params,
     msg: string,
   ) {
+    if (msg.includes("fatal: could not read Username for ")) {
+      // NOTE: It is github's invalid repository error message.
+      await printError(denops, "Target repository name is invalid.");
+      await printError(denops, "You may have used the wrong plugin name.");
+    }
+
     await printError(denops, msg);
     this.#updateLogs.push(msg);
     this.#logs.push(msg);
