@@ -931,33 +931,28 @@ export class Ext extends BaseExt<Params> {
     if (!await fn.executable(denops, "deno")) {
       return;
     }
-    const entries = await Promise.all(plugins.map(async (plugin) => {
-      if (!plugin.path || !await isDirectory(`${plugin.path}/denops`)) {
-        return [];
-      }
-      return await Array.fromAsync(
-        expandGlob(`${plugin.path}/denops/**/*.ts`),
-      );
-    }));
-    const files = entries.flatMap((files) => files.map(({ path }) => path));
-    if (!files.length) {
-      return;
-    }
 
     // Execute "deno cache" to optimize
-    const { stdout, stderr, status } = new Deno.Command(
-      "deno",
-      {
-        args: ["cache", "--no-check", "--reload"].concat(files),
-        env: { NO_COLOR: "1" },
-        stdout: "piped",
-        stderr: "piped",
-      },
-    ).spawn();
+    for (const plugin of plugins) {
+      if (!plugin.path || !await isDirectory(`${plugin.path}/denops`)) {
+        continue;
+      }
 
-    pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
-    pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-    await status;
+      const { stdout, stderr, status } = new Deno.Command(
+        "deno",
+        {
+          args: ["cache", "--no-check", "--reload", "."],
+          env: { NO_COLOR: "1" },
+          stdout: "piped",
+          stderr: "piped",
+          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+        },
+      ).spawn();
+
+      pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
+      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+      await status;
+    }
   }
 
   async #revisionLockPlugin(
