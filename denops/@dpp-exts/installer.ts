@@ -5,22 +5,22 @@ import type {
   ExtOptions,
   Plugin,
   ProtocolName,
-} from "jsr:@shougo/dpp-vim@~4.3.0/types";
-import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~4.3.0/ext";
-import type { Protocol } from "jsr:@shougo/dpp-vim@~4.3.0/protocol";
+} from "jsr:@shougo/dpp-vim@~4.5.0/types";
+import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~4.5.0/ext";
+import type { Protocol } from "jsr:@shougo/dpp-vim@~4.5.0/protocol";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@~4.3.0/utils";
+} from "jsr:@shougo/dpp-vim@~4.5.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.5.0";
-import { batch } from "jsr:@denops/std@~7.5.0/batch";
-import * as autocmd from "jsr:@denops/std@~7.5.0/autocmd";
-import * as op from "jsr:@denops/std@~7.5.0/option";
-import * as fn from "jsr:@denops/std@~7.5.0/function";
-import * as vars from "jsr:@denops/std@~7.5.0/variable";
+import type { Denops } from "jsr:@denops/std@~7.6.0";
+import { batch } from "jsr:@denops/std@~7.6.0/batch";
+import * as autocmd from "jsr:@denops/std@~7.6.0/autocmd";
+import * as op from "jsr:@denops/std@~7.6.0/option";
+import * as fn from "jsr:@denops/std@~7.6.0/function";
+import * as vars from "jsr:@denops/std@~7.6.0/variable";
 
 import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
 import { delay } from "jsr:@std/async@~1.0.3/delay";
@@ -431,6 +431,7 @@ export class Ext extends BaseExt<Params> {
       })
     ));
 
+    // When denops.vim
     if (args.extParams.enableDenoCache && updatedPlugins) {
       await this.#denoCachePlugins(
         args.denops,
@@ -934,7 +935,10 @@ export class Ext extends BaseExt<Params> {
 
     // Execute "deno cache" to optimize
     for (const plugin of plugins) {
-      if (!plugin.path || !await isDirectory(`${plugin.path}/denops`)) {
+      if (
+        !plugin.path || !await isDirectory(`${plugin.path}/denops`) ||
+        plugin.name !== "denops.vim"
+      ) {
         continue;
       }
 
