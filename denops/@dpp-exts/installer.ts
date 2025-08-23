@@ -937,7 +937,7 @@ export class Ext extends BaseExt<Params> {
     for (const plugin of plugins) {
       if (
         !plugin.path || !await isDirectory(`${plugin.path}/denops`) ||
-        plugin.name !== "denops.vim"
+        plugin.name === "denops.vim"
       ) {
         continue;
       }
