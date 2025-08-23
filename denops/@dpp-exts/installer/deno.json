@@ -1,4 +1,13 @@
 {
+  "name": "@shougo/dpp-ext-installer",
+  "exports": {
+    ".": "./installer.ts"
+  },
+  "publish": {
+    "include": [
+      "**/*.ts"
+    ]
+  },
   "imports": {
     "@core/asyncutil": "jsr:@core/asyncutil@~1.2.0",
     "@denops/std": "jsr:@denops/std@~7.6.0",
