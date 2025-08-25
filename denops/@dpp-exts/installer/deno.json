@@ -1,0 +1,18 @@
+{
+  "name": "@shougo/dpp-ext-installer",
+  "exports": {
+    ".": "./installer.ts"
+  },
+  "publish": {
+    "include": [
+      "**/*.ts"
+    ]
+  },
+  "imports": {
+    "@core/asyncutil": "jsr:@core/asyncutil@~1.2.0",
+    "@denops/std": "jsr:@denops/std@~8.0.0",
+    "@shougo/dpp-vim": "jsr:@shougo/dpp-vim@~5.0.0",
+    "@std/async": "jsr:@std/async@~1.0.7",
+    "@std/streams": "jsr:@std/streams@~1.0.1"
+  }
+}

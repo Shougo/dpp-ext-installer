@@ -5,27 +5,26 @@ import type {
   ExtOptions,
   Plugin,
   ProtocolName,
-} from "jsr:@shougo/dpp-vim@~4.5.0/types";
-import { type Action, BaseExt } from "jsr:@shougo/dpp-vim@~4.5.0/ext";
-import type { Protocol } from "jsr:@shougo/dpp-vim@~4.5.0/protocol";
+} from "@shougo/dpp-vim/types";
+import { type Action, BaseExt } from "@shougo/dpp-vim/ext";
+import type { Protocol } from "@shougo/dpp-vim/protocol";
 import {
   convert2List,
   isDirectory,
   printError,
   safeStat,
-} from "jsr:@shougo/dpp-vim@~4.5.0/utils";
+} from "@shougo/dpp-vim/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.6.0";
-import { batch } from "jsr:@denops/std@~7.6.0/batch";
-import * as autocmd from "jsr:@denops/std@~7.6.0/autocmd";
-import * as op from "jsr:@denops/std@~7.6.0/option";
-import * as fn from "jsr:@denops/std@~7.6.0/function";
-import * as vars from "jsr:@denops/std@~7.6.0/variable";
+import type { Denops } from "@denops/std";
+import { batch } from "@denops/std/batch";
+import * as autocmd from "@denops/std/autocmd";
+import * as op from "@denops/std/option";
+import * as fn from "@denops/std/function";
+import * as vars from "@denops/std/variable";
 
-import { expandGlob } from "jsr:@std/fs@~1.0.1/expand-glob";
-import { delay } from "jsr:@std/async@~1.0.3/delay";
-import { TextLineStream } from "jsr:@std/streams@~1.0.1/text-line-stream";
-import { Semaphore } from "jsr:@core/asyncutil@~1.2.0/semaphore";
+import { delay } from "@std/async/delay";
+import { TextLineStream } from "@std/streams/text-line-stream";
+import { Semaphore } from "@core/asyncutil/semaphore";
 
 export type Params = {
   checkDiff: boolean;
