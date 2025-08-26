@@ -1,7 +1,7 @@
 {
   "name": "@shougo/dpp-ext-installer",
   "exports": {
-    ".": "./installer.ts"
+    ".": "./main.ts"
   },
   "publish": {
     "include": [
