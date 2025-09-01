@@ -28,7 +28,6 @@ import { Semaphore } from "@core/asyncutil/semaphore";
 
 export type Params = {
   checkDiff: boolean;
-  enableDenoCache: boolean;
   githubAPIToken: string;
   logFilePath: string;
   maxProcesses: number;
@@ -359,7 +358,6 @@ export class Ext extends BaseExt<Params> {
   override params(): Params {
     return {
       checkDiff: false,
-      enableDenoCache: true,
       githubAPIToken: "",
       logFilePath: "",
       maxProcesses: 5,
@@ -429,15 +427,6 @@ export class Ext extends BaseExt<Params> {
         }
       })
     ));
-
-    // When denops.vim
-    if (args.extParams.enableDenoCache && updatedPlugins) {
-      await this.#denoCachePlugins(
-        args.denops,
-        args.extParams,
-        updatedPlugins.map(({ plugin }) => plugin),
-      );
-    }
 
     const calledDepends: Record<string, boolean> = {};
     for (const updated of updatedPlugins) {
