@@ -130,14 +130,15 @@ export class Ext extends BaseExt<Params> {
         const params = args.actionParams as CheckNotUpdatedParams;
 
         const updatedPlugins = Array.from(
-          new Set(
-            (await this.#checkUpdatedPlugins(
+          new Set([
+            ...await this.#checkUpdatedPlugins(
               args,
               await getPlugins(args.denops, params.names ?? []),
-            )).concat(await this.actions.getNotInstalled.callback(args)).map((
+            ),
+            ...(await this.actions.getNotInstalled.callback(args)).map((
               plugin,
             ) => plugin.name),
-          ),
+          ]),
         ).sort();
 
         if (updatedPlugins.length === 0) {
