@@ -242,7 +242,7 @@ Dpp:ext:installer:updateDone
 
 ==============================================================================
 EXAMPLES                                          *dpp-ext-installer-examples*
->
+>vim
 	" Install plugins
 	call dpp#async_ext_action('installer', 'install')
 
@@ -282,6 +282,9 @@ FAQ 4:                                               |dpp-ext-installer-faq-4|
 FAQ 5:                                               |dpp-ext-installer-faq-5|
 	I want to use lockfile system.
 
+FAQ 6:                                               |dpp-ext-installer-faq-6|
+	I want to update failed plugins.
+
 ------------------------------------------------------------------------------
                                                      *dpp-ext-installer-faq-1*
 Q: The installation/update is slow.
@@ -308,14 +311,14 @@ Note: In neovim, messages delimiters are broken.  It is known problem.
                                                      *dpp-ext-installer-faq-3*
 Q: I want to quit Vim after updated plugins.
 
-A: >
+A: >vim
 	autocmd User Dpp:ext:installer:updateDone quit
 <
 
                                                      *dpp-ext-installer-faq-4*
 Q: I want to get not updated plugins by Ddu.
 
-A: >
+A: >vim
 	call ddu#start(#{
 	    \   sources: [
 	    \     #{
@@ -333,6 +336,14 @@ Q: I want to use lockfile system.
 
 A: You can use "rollback" param when |dpp-ext-installer-action-install| or
 |dpp-ext-installer-action-update|.
+
+                                                     *dpp-ext-installer-faq-6*
+Q: I want to update failed plugins.
+
+A: >vim
+	call dpp#async_ext_action('installer', 'update',
+	    \ #{ names: dpp#sync_ext_action('installer', 'getFailed') })
+<
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
