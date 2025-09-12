@@ -342,7 +342,8 @@ Q: I want to update failed plugins.
 
 A: >vim
 	call dpp#async_ext_action('installer', 'update',
-	    \ #{ names: dpp#sync_ext_action('installer', 'getFailed') })
+	    \ #{ names: dpp#sync_ext_action('installer', 'getFailed')
+	    \ ->map({ _, val -> val.name }) })
 <
 
 ==============================================================================
