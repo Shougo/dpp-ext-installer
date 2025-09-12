@@ -131,10 +131,12 @@ export class Ext extends BaseExt<Params> {
 
         const updatedPlugins = Array.from(
           new Set([
-            ...await this.#checkUpdatedPlugins(
+            ...(await this.#checkUpdatedPlugins(
               args,
               await getPlugins(args.denops, params.names ?? []),
-            ),
+            )).map((
+              plugin,
+            ) => plugin.name),
             ...(await this.actions.getNotInstalled.callback(args)).map((
               plugin,
             ) => plugin.name),
