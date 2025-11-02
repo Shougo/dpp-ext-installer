@@ -59,6 +59,11 @@ type UpdatedPlugin = {
   changesCount: number;
 };
 
+type CheckUpdatedPlugin = {
+  plugin: Plugin;
+  updated?: Date;
+};
+
 type Rollbacks = Record<string, string>;
 
 export type ExtActions<Params extends BaseParams> = {
@@ -129,38 +134,103 @@ export class Ext extends BaseExt<Params> {
       }) => {
         const params = args.actionParams as CheckNotUpdatedParams;
 
-        const updatedPlugins = Array.from(
-          new Set([
-            ...(await this.#checkUpdatedPlugins(
-              args,
-              await getPlugins(args.denops, params.names ?? []),
-            )).map((
-              plugin,
-            ) => plugin.name),
-            ...(await this.actions.getNotInstalled.callback(args)).map((
-              plugin,
-            ) => plugin.name),
-          ]),
-        ).sort();
+        const checked = await this.#checkUpdatedPlugins(
+          args,
+          await getPlugins(args.denops, params.names ?? []),
+        );
+
+        const notInstalled = await this.actions.getNotInstalled.callback(args);
+
+        const map = new Map<string, CheckUpdatedPlugin>();
+        for (const cp of checked) {
+          map.set(cp.plugin.name, cp);
+        }
+        for (const p of notInstalled) {
+          if (!map.has(p.name)) {
+            map.set(p.name, { plugin: p });
+          }
+        }
+
+        const updatedPlugins: CheckUpdatedPlugin[] = Array.from(
+          map.values(),
+        ).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
 
         if (updatedPlugins.length === 0) {
           await this.#printMessage(
             args.denops,
             args.extParams,
-            "updated plugins are not found.",
+            "Updated plugins are not found.",
           );
           return;
         }
 
+        function timeAgo(d: Date, now = new Date()): string {
+          const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+          if (diffSec < 0) return "just now";
+          if (diffSec < 60) {
+            const s = diffSec;
+            return `${s} second${s === 1 ? "" : "s"} ago`;
+          }
+          const diffMin = Math.floor(diffSec / 60);
+          if (diffMin < 60) {
+            const m = diffMin;
+            return `${m} minute${m === 1 ? "" : "s"} ago`;
+          }
+          const diffHour = Math.floor(diffMin / 60);
+          if (diffHour < 24) {
+            const h = diffHour;
+            return `${h} hour${h === 1 ? "" : "s"} ago`;
+          }
+          const diffDay = Math.floor(diffHour / 24);
+          if (diffDay < 30) {
+            const d = diffDay;
+            return `${d} day${d === 1 ? "" : "s"} ago`;
+          }
+          const diffMonth = Math.floor(diffDay / 30);
+          if (diffMonth < 12) {
+            const mo = diffMonth;
+            return `${mo} month${mo === 1 ? "" : "s"} ago`;
+          }
+          const diffYear = Math.floor(diffDay / 365);
+          const y = diffYear;
+          return `${y} year${y === 1 ? "" : "s"} ago`;
+        }
+
         const force = params.force ?? false;
         if (!force) {
-          const updatedText = (updatedPlugins.length > 10)
-            ? updatedPlugins.slice(0, 10).join("\n") + "\n..."
-            : updatedPlugins.join("\n");
+          // "YYYY-MM-DD HH:MM:SS"
+          const formatDate = (d: Date) =>
+            d.toISOString().replace("T", " ").slice(0, 19);
+
+          const sorted = [...updatedPlugins].sort((a, b) =>
+            a.plugin.name.localeCompare(b.plugin.name)
+          );
+          const maxNameLen = sorted.reduce(
+            (m, p) => Math.max(m, p.plugin.name.length),
+            0,
+          );
+
+          const lines = sorted.map((p) => {
+            const name = p.plugin.name.padEnd(maxNameLen);
+            if (p.updated) {
+              return `${name}: ${formatDate(p.updated)} (${
+                timeAgo(p.updated)
+              })`;
+            } else {
+              return `${name}: Not installed`;
+            }
+          });
+
+          const displayedLines = lines.length > 10
+            ? [...lines.slice(0, 10), "..."]
+            : lines;
+
           if (
             await fn.confirm(
               args.denops,
-              `Updated plugins:\n${updatedText}\n\nUpdate now?`,
+              `${
+                ["Updated plugins", "", ...displayedLines].join("\n")
+              }\n\nUpdate now?`,
               "yes\nNo",
               2,
             ) !== 1
@@ -169,7 +239,10 @@ export class Ext extends BaseExt<Params> {
           }
         }
 
-        const plugins = await getPlugins(args.denops, updatedPlugins);
+        const plugins = await getPlugins(
+          args.denops,
+          updatedPlugins.map((updated) => updated.plugin.name),
+        );
         await this.#updatePlugins(args, plugins, {});
       },
     },
@@ -220,10 +293,10 @@ export class Ext extends BaseExt<Params> {
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
-        const plugins = await this.#checkUpdatedPlugins(
+        const plugins = (await this.#checkUpdatedPlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
-        );
+        )).map((updated) => updated.plugin);
 
         return plugins;
       },
@@ -720,7 +793,7 @@ export class Ext extends BaseExt<Params> {
       extParams: Params;
     },
     plugins: Plugin[],
-  ): Promise<Plugin[]> {
+  ): Promise<CheckUpdatedPlugin[]> {
     if (plugins.length === 0) {
       await this.#printError(
         args.denops,
@@ -755,7 +828,7 @@ export class Ext extends BaseExt<Params> {
 
     if (!baseUpdated) {
       // Not updated yet.
-      return plugins;
+      return [];
     }
 
     // Create query string.
@@ -802,10 +875,15 @@ export class Ext extends BaseExt<Params> {
       return [];
     }
 
-    return plugins.filter((_, index) =>
-      result.data[`repo${index}`]?.pushedAt &&
-      new Date(result.data[`repo${index}`].pushedAt) > baseUpdated
-    );
+    return plugins
+      .map((plugin, index) => {
+        const pushedAt = result?.data?.[`repo${index}`]?.pushedAt;
+        const updated = pushedAt ? new Date(pushedAt) : undefined;
+        if (updated && updated > baseUpdated) {
+          return { plugin, updated } as CheckUpdatedPlugin;
+        }
+        return undefined;
+      }).filter((p): p is CheckUpdatedPlugin => p !== undefined);
   }
 
   async #getLogMessage(
