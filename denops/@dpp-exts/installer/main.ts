@@ -687,6 +687,14 @@ export class Ext extends BaseExt<Params> {
       );
     }
 
+    if (plugin.hook_pre_update) {
+      await args.denops.call(
+        "dpp#ext#installer#_call_hook",
+        "pre_update",
+        plugin,
+      );
+    }
+
     // Execute commands
     let updateSuccess = true;
     for (const command of commands) {
