@@ -357,15 +357,15 @@ export class Ext extends BaseExt<Params> {
         const params = args.actionParams as InstallParams;
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
-        const revisions = params.rollback
-          ? await loadRollbackFile(args.denops, params.rollback)
-          : {};
-
         const bits = await Promise.all(
           plugins.map(async (plugin) =>
             plugin.path && !await isDirectory(plugin.path)
           ),
         );
+
+        const revisions = params.rollback
+          ? await loadRollbackFile(args.denops, params.rollback)
+          : {};
 
         await this.#updatePlugins(
           args,
@@ -426,7 +426,13 @@ export class Ext extends BaseExt<Params> {
           ? await loadRollbackFile(args.denops, params.rollback)
           : {};
 
-        await this.#updatePlugins(args, plugins, revisions);
+        await this.#updatePlugins(
+          args,
+          plugins.filter((plugin) =>
+            !(plugin.extAttrs as Attrs)?.installerFrozen
+          ),
+          revisions,
+        );
       },
     },
   };
@@ -1177,9 +1183,7 @@ async function getPlugins(
       denops,
       "dpp#_plugins",
     ),
-  ) as Plugin[]).filter((plugin) =>
-    !plugin.local && !(plugin.extAttrs as Attrs)?.installerFrozen
-  );
+  ) as Plugin[]).filter((plugin) => !plugin.local);
 
   if (names.length > 0) {
     plugins = plugins.filter((plugin) => names.indexOf(plugin.name) >= 0);

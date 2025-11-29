@@ -191,7 +191,6 @@ installerBuild  (String)
 installerFrozen (Bool)
 		If set to v:true, dpp doesn't update it automatically. It is
 		useful for outdated plugins that can no longer be updated.
-		The remote branch for git type.
 
 ------------------------------------------------------------------------------
 PARAMS                                              *dpp-ext-installer-params*
