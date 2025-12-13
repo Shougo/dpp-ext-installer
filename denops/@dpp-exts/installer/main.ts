@@ -647,6 +647,16 @@ export class Ext extends BaseExt<Params> {
       `[${index}/${maxLength}] ${plugin.name}`,
     );
 
+    if (plugin.local) {
+      await this.#printMessage(
+        args.denops,
+        args.extParams,
+        `"${plugin.name}" is local plugin.  The update is skipped.`,
+      );
+
+      return;
+    }
+
     const protocol = args.protocols[plugin.protocol ?? ""];
 
     const oldRev = await protocol.protocol.getRevision({
@@ -1178,12 +1188,12 @@ async function getPlugins(
   names: string[],
 ): Promise<Plugin[]> {
   // NOTE: Skip local plugins
-  let plugins = (Object.values(
+  let plugins = Object.values(
     await vars.g.get(
       denops,
       "dpp#_plugins",
     ),
-  ) as Plugin[]).filter((plugin) => !plugin.local);
+  ) as Plugin[];
 
   if (names.length > 0) {
     plugins = plugins.filter((plugin) => names.indexOf(plugin.name) >= 0);
