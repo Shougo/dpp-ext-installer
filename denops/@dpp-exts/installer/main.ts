@@ -44,7 +44,7 @@ export type InstallParams = {
   rollback?: string;
 };
 
-export type CheckNotUpdatedParams = {
+export type CheckParams = {
   names?: string[];
   force?: boolean;
 };
@@ -69,6 +69,7 @@ type Rollbacks = Record<string, string>;
 export type ExtActions<Params extends BaseParams> = {
   build: Action<Params, void>;
   checkNotUpdated: Action<Params, void>;
+  checkRemote: Action<Params, void>;
   denoCache: Action<Params, void>;
   getNotInstalled: Action<Params, Plugin[]>;
   getNotUpdated: Action<Params, Plugin[]>;
@@ -132,9 +133,9 @@ export class Ext extends BaseExt<Params> {
         extParams: Params;
         actionParams: BaseParams;
       }) => {
-        const params = args.actionParams as CheckNotUpdatedParams;
+        const params = args.actionParams as CheckParams;
 
-        const checked = await this.#checkUpdatedPlugins(
+        const checked = await this.#checkGithubUpdatedPlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
         );
@@ -164,77 +165,57 @@ export class Ext extends BaseExt<Params> {
           return;
         }
 
-        function timeAgo(d: Date, now = new Date()): string {
-          const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
-          if (diffSec < 0) return "just now";
-          if (diffSec < 60) {
-            const s = diffSec;
-            return `${s} second${s === 1 ? "" : "s"} ago`;
+        if (!params.force) {
+          const check = await this.#displayUpdatedPlugins(
+            args.denops,
+            updatedPlugins,
+          );
+          if (!check) {
+            return;
           }
-          const diffMin = Math.floor(diffSec / 60);
-          if (diffMin < 60) {
-            const m = diffMin;
-            return `${m} minute${m === 1 ? "" : "s"} ago`;
-          }
-          const diffHour = Math.floor(diffMin / 60);
-          if (diffHour < 24) {
-            const h = diffHour;
-            return `${h} hour${h === 1 ? "" : "s"} ago`;
-          }
-          const diffDay = Math.floor(diffHour / 24);
-          if (diffDay < 30) {
-            const d = diffDay;
-            return `${d} day${d === 1 ? "" : "s"} ago`;
-          }
-          const diffMonth = Math.floor(diffDay / 30);
-          if (diffMonth < 12) {
-            const mo = diffMonth;
-            return `${mo} month${mo === 1 ? "" : "s"} ago`;
-          }
-          const diffYear = Math.floor(diffDay / 365);
-          const y = diffYear;
-          return `${y} year${y === 1 ? "" : "s"} ago`;
         }
 
-        const force = params.force ?? false;
-        if (!force) {
-          // "YYYY-MM-DD HH:MM:SS"
-          const formatDate = (d: Date) =>
-            d.toISOString().replace("T", " ").slice(0, 19);
+        const plugins = await getPlugins(
+          args.denops,
+          updatedPlugins.map((updated) => updated.plugin.name),
+        );
+        await this.#updatePlugins(args, plugins, {});
+      },
+    },
+    checkRemote: {
+      description: "Check remote updated plugins",
+      callback: async (args: {
+        denops: Denops;
+        context: Context;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        extOptions: ExtOptions;
+        extParams: Params;
+        actionParams: BaseParams;
+      }) => {
+        const params = args.actionParams as CheckParams;
 
-          const sorted = [...updatedPlugins].sort((a, b) =>
-            a.plugin.name.localeCompare(b.plugin.name)
+        const updatedPlugins: CheckUpdatedPlugin[] =
+          (await this.#checkRemotePlugins(
+            args,
+            await getPlugins(args.denops, params.names ?? []),
+          )).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
+
+        if (updatedPlugins.length === 0) {
+          await this.#printMessage(
+            args.denops,
+            args.extParams,
+            "Updated plugins are not found.",
           );
-          const maxNameLen = sorted.reduce(
-            (m, p) => Math.max(m, p.plugin.name.length),
-            0,
+          return;
+        }
+
+        if (!params.force) {
+          const check = await this.#displayUpdatedPlugins(
+            args.denops,
+            updatedPlugins,
           );
-
-          const lines = sorted.map((p) => {
-            const name = p.plugin.name.padEnd(maxNameLen);
-            if (p.updated) {
-              return `${name}: ${formatDate(p.updated)} (${
-                timeAgo(p.updated)
-              })`;
-            } else {
-              return `${name}: Not installed`;
-            }
-          });
-
-          const displayedLines = lines.length > 10
-            ? [...lines.slice(0, 10), "..."]
-            : lines;
-
-          if (
-            await fn.confirm(
-              args.denops,
-              `${
-                ["Updated plugins", "", ...displayedLines].join("\n")
-              }\n\nUpdate now?`,
-              "yes\nNo",
-              2,
-            ) !== 1
-          ) {
+          if (!check) {
             return;
           }
         }
@@ -810,6 +791,289 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
+  async #checkRemotePlugins(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      protocols: Record<ProtocolName, Protocol>;
+      extParams: Params;
+      actionParams: BaseParams;
+    },
+    plugins: Plugin[],
+  ): Promise<CheckUpdatedPlugin[]> {
+    if (plugins.length === 0) {
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        "Target plugins are not found.",
+      );
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        "You may have used the wrong plugin name," +
+          " or all of the plugins are already installed.",
+      );
+
+      return [];
+    }
+
+    await this.#printMessage(
+      args.denops,
+      args.extParams,
+      `Start: ${new Date()}`,
+    );
+
+    const updatedPlugins: UpdatedPlugin[] = [];
+    const sem = new Semaphore(args.extParams.maxProcesses);
+    await Promise.all(plugins.map((plugin, index) =>
+      sem.lock(async () => {
+        await this.#checkRemotePlugin(
+          args,
+          updatedPlugins,
+          plugins.length,
+          plugin,
+          index + 1,
+        );
+
+        if (args.extParams.wait > 0) {
+          await delay(args.extParams.wait);
+        }
+      })
+    ));
+
+    if (updatedPlugins.length > 0) {
+      const formatPlugin = (updated: UpdatedPlugin): string => {
+        const changes = updated.changesCount === 0
+          ? ""
+          : `(${updated.changesCount} change${
+            updated.changesCount === 1 ? "" : "s"
+          })`;
+        return `  ${updated.plugin.name}${changes}`;
+      };
+
+      await this.#printMessage(
+        args.denops,
+        args.extParams,
+        "Updated plugins:\n" +
+          `${
+            updatedPlugins.map((updated) => formatPlugin(updated)).join("\n")
+          }`,
+      );
+
+      // If it has breaking changes commit message
+      // https://www.conventionalcommits.org/en/v1.0.0/
+      const breakingPlugins = updatedPlugins.filter(
+        (updated) => updated.logMessage.match(/.*!.*:|BREAKING CHANGE:/),
+      );
+
+      if (breakingPlugins.length > 0) {
+        await this.#printMessage(
+          args.denops,
+          args.extParams,
+          "Breaking updated plugins:\n" +
+            `${
+              breakingPlugins.map((updated) => "    " + updated.plugin.name)
+                .join("\n")
+            }`,
+        );
+      }
+    }
+
+    await args.denops.call("dpp#ext#installer#_close_progress_window");
+
+    // NOTE: "redraw" is needed to close popup window
+    await args.denops.cmd("redraw");
+
+    await this.#printMessage(
+      args.denops,
+      args.extParams,
+      `Done: ${new Date()}`,
+    );
+
+    return updatedPlugins.map((plugin) => {
+      return { plugin: plugin.plugin };
+    });
+  }
+
+  async #checkRemotePlugin(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      protocols: Record<ProtocolName, Protocol>;
+      extParams: Params;
+      actionParams: BaseParams;
+    },
+    updatedPlugins: UpdatedPlugin[],
+    maxLength: number,
+    plugin: Plugin,
+    index: number,
+  ) {
+    await this.#printProgress(
+      args.denops,
+      args.extParams,
+      `[${index}/${maxLength}] ${plugin.name}`,
+    );
+
+    if (plugin.local) {
+      return;
+    }
+
+    const protocol = args.protocols[plugin.protocol ?? ""];
+
+    const commands = await protocol.protocol.getCheckRemoteCommands({
+      denops: args.denops,
+      plugin,
+      protocolOptions: protocol.options,
+      protocolParams: protocol.params,
+    });
+
+    // Execute commands
+    let updateSuccess = true;
+    const logMessage: string[] = [];
+    for (const command of commands) {
+      const { stdout, stderr, status } = new Deno.Command(
+        command.command,
+        {
+          args: command.args,
+          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          stdout: "piped",
+          stderr: "piped",
+        },
+      ).spawn();
+
+      await pipeStream(stdout, (msg) => logMessage.push(msg));
+      pipeStream(
+        stderr,
+        this.#printError.bind(this, args.denops, args.extParams),
+      );
+
+      const { success } = await status;
+      if (!success) {
+        updateSuccess = false;
+        break;
+      }
+    }
+
+    if (updateSuccess && logMessage.length > 0) {
+      const url = await protocol.protocol.getUrl({
+        denops: args.denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+      });
+
+      updatedPlugins.push({
+        plugin,
+        protocol,
+        oldRev: "",
+        newRev: "",
+        url,
+        logMessage: logMessage.join("\n"),
+        changesCount: logMessage.length,
+      });
+    }
+  }
+
+  async #checkGithubUpdatedPlugins(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      extParams: Params;
+    },
+    plugins: Plugin[],
+  ): Promise<CheckUpdatedPlugin[]> {
+    if (plugins.length === 0) {
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        "Target plugins are not found.",
+      );
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        "You may have used the wrong plugin name," +
+          " or all of the plugins are already installed.",
+      );
+      return [];
+    }
+
+    if (args.extParams.githubAPIToken.length === 0) {
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        '"githubAPIToken" must be set.',
+      );
+      return [];
+    }
+
+    // Get the last updated time by rollbackfile timestamp.
+    const basePath = await vars.g.get(args.denops, "dpp#_base_path");
+    const name = await vars.g.get(args.denops, "dpp#_name");
+    const rollbackDir = `${basePath}/${name}/rollbacks/latest`;
+    const rollbackFile = `${rollbackDir}/rollback.json`;
+    const rollbackStat = await safeStat(rollbackFile);
+    const baseUpdated = rollbackStat ? rollbackStat.mtime : null;
+
+    if (!baseUpdated) {
+      // Not updated yet.
+      return [];
+    }
+
+    // Create query string.
+    const query = "query {\n" +
+      [...plugins.entries()].flatMap(([index, plugin]) => {
+        if (!plugin.repo) return [];
+        const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
+        if (!owner || !name) return [];
+        // NOTE: "repository" API is faster than "search" API
+        return [
+          `repo${index}: repository(owner:"${owner}", name:"${name}"){ pushedAt }`,
+        ];
+      }).join("\n") + "\n}";
+
+    // POST github API
+    const resp = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${args.extParams.githubAPIToken}`,
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!resp.ok) {
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        `Failed to fetch from GitHub GraphQL API: ${resp.statusText}`,
+      );
+      return [];
+    }
+
+    const result = await resp.json() as
+      | { data: Record<string, { pushedAt: string }> }
+      | { errors: { message: string }[] };
+
+    if ("errors" in result) {
+      await this.#printError(
+        args.denops,
+        args.extParams,
+        `Failed to fetch from GitHub GraphQL API: ${result.errors[0].message}`,
+      );
+      return [];
+    }
+
+    return plugins
+      .map((plugin, index) => {
+        const pushedAt = result?.data?.[`repo${index}`]?.pushedAt;
+        const updated = pushedAt ? new Date(pushedAt) : undefined;
+        if (updated && updated > baseUpdated) {
+          return { plugin, updated } as CheckUpdatedPlugin;
+        }
+        return undefined;
+      }).filter((p): p is CheckUpdatedPlugin => p !== undefined);
+  }
+
   async #checkUpdatedPlugins(
     args: {
       denops: Denops;
@@ -1123,6 +1387,75 @@ export class Ext extends BaseExt<Params> {
       pipeStream(stderr, this.#printError.bind(this, denops, extParams));
       await status.then(() => outputCheckDiff(denops, output));
     }
+  }
+
+  async #displayUpdatedPlugins(
+    denops: Denops,
+    updatedPlugins: CheckUpdatedPlugin[],
+  ): Promise<boolean> {
+    function timeAgo(d: Date, now = new Date()): string {
+      const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+      if (diffSec < 0) return "just now";
+      if (diffSec < 60) {
+        const s = diffSec;
+        return `${s} second${s === 1 ? "" : "s"} ago`;
+      }
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) {
+        const m = diffMin;
+        return `${m} minute${m === 1 ? "" : "s"} ago`;
+      }
+      const diffHour = Math.floor(diffMin / 60);
+      if (diffHour < 24) {
+        const h = diffHour;
+        return `${h} hour${h === 1 ? "" : "s"} ago`;
+      }
+      const diffDay = Math.floor(diffHour / 24);
+      if (diffDay < 30) {
+        const d = diffDay;
+        return `${d} day${d === 1 ? "" : "s"} ago`;
+      }
+      const diffMonth = Math.floor(diffDay / 30);
+      if (diffMonth < 12) {
+        const mo = diffMonth;
+        return `${mo} month${mo === 1 ? "" : "s"} ago`;
+      }
+      const diffYear = Math.floor(diffDay / 365);
+      const y = diffYear;
+      return `${y} year${y === 1 ? "" : "s"} ago`;
+    }
+
+    // "YYYY-MM-DD HH:MM:SS"
+    const formatDate = (d: Date) =>
+      d.toISOString().replace("T", " ").slice(0, 19);
+
+    const sorted = [...updatedPlugins].sort(
+      (a, b) => a.plugin.name.localeCompare(b.plugin.name),
+    );
+    const maxNameLen = sorted.reduce(
+      (m, p) => Math.max(m, p.plugin.name.length),
+      0,
+    );
+
+    const lines = sorted.map((p) => {
+      const name = p.plugin.name.padEnd(maxNameLen);
+      if (p.updated) {
+        return `${name}: ${formatDate(p.updated)} (${timeAgo(p.updated)})`;
+      } else {
+        return `${name}`;
+      }
+    });
+
+    const displayedLines = lines.length > 10
+      ? [...lines.slice(0, 10), "..."]
+      : lines;
+
+    return await fn.confirm(
+      denops,
+      `${["Updated plugins", "", ...displayedLines].join("\n")}\n\nUpdate now?`,
+      "yes\nNo",
+      2,
+    ) === 1;
   }
 
   async #printError(

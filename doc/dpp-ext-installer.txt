@@ -73,6 +73,20 @@ checkNotUpdated
 			{force}:	Force update plugins if possible.
 					(Default: false)
 
+                                        *dpp-ext-installer-action-checkRemote*
+checkRemote
+		Check updated plugins from remote repository. It does not use
+		Github API.
+		It does not return value but prompts whether update.
+		NOTE: The update check is slower than
+		|dpp-ext-installer-action-checkNotUpdated|.
+
+		params:
+			{names}:	Plugin names.
+					(Default: [])
+			{force}:	Force update plugins if possible.
+					(Default: false)
+
                                           *dpp-ext-installer-action-denoCache*
 denoCache
 		Execute "deno cache --reload" for plugins.
