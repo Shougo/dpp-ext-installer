@@ -843,12 +843,18 @@ export class Ext extends BaseExt<Params> {
 
     if (updatedPlugins.length > 0) {
       const formatPlugin = (updated: UpdatedPlugin): string => {
+        const compareLink =
+          updated.oldRev !== "" && /^https?:\/\/github.com\//.test(updated.url)
+            ? `\n    ${
+              updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
+            }/compare/${updated.oldRev}...${updated.newRev}`
+            : "";
         const changes = updated.changesCount === 0
           ? ""
           : `(${updated.changesCount} change${
             updated.changesCount === 1 ? "" : "s"
           })`;
-        return `  ${updated.plugin.name}${changes}`;
+        return `  ${updated.plugin.name}${changes}${compareLink}`;
       };
 
       await this.#printMessage(
@@ -962,11 +968,25 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
+      const oldRev = await protocol.protocol.getRevision({
+        denops: args.denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+      });
+
+      const newRev = await protocol.protocol.getRemoteRevision({
+        denops: args.denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+      });
+
       updatedPlugins.push({
         plugin,
         protocol,
-        oldRev: "",
-        newRev: "",
+        oldRev,
+        newRev,
         url,
         logMessage: logMessage.join("\n"),
         changesCount: logMessage.length,
