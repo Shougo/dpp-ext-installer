@@ -69,12 +69,13 @@ type Rollbacks = Record<string, string>;
 export type ExtActions<Params extends BaseParams> = {
   build: Action<Params, void>;
   checkNotUpdated: Action<Params, void>;
-  checkRemote: Action<Params, void>;
+  checkRemoteUpdated: Action<Params, void>;
   denoCache: Action<Params, void>;
-  getNotInstalled: Action<Params, Plugin[]>;
-  getNotUpdated: Action<Params, Plugin[]>;
   getFailed: Action<Params, Plugin[]>;
   getLogs: Action<Params, string[]>;
+  getNotInstalled: Action<Params, Plugin[]>;
+  getNotUpdated: Action<Params, Plugin[]>;
+  getRemoteUpdated: Action<Params, Plugin[]>;
   getUpdateLogs: Action<Params, string[]>;
   getUpdated: Action<Params, Plugin[]>;
   install: Action<Params, void>;
@@ -182,7 +183,7 @@ export class Ext extends BaseExt<Params> {
         await this.#updatePlugins(args, plugins, {});
       },
     },
-    checkRemote: {
+    checkRemoteUpdated: {
       description: "Check remote updated plugins",
       callback: async (args: {
         denops: Denops;
@@ -195,11 +196,26 @@ export class Ext extends BaseExt<Params> {
       }) => {
         const params = args.actionParams as CheckParams;
 
-        const updatedPlugins: CheckUpdatedPlugin[] =
-          (await this.#checkRemotePlugins(
-            args,
-            await getPlugins(args.denops, params.names ?? []),
-          )).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
+        const checked: CheckUpdatedPlugin[] = (await this.#checkRemotePlugins(
+          args,
+          await getPlugins(args.denops, params.names ?? []),
+        )).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
+
+        const notInstalled = await this.actions.getNotInstalled.callback(args);
+
+        const map = new Map<string, CheckUpdatedPlugin>();
+        for (const cp of checked) {
+          map.set(cp.plugin.name, cp);
+        }
+        for (const p of notInstalled) {
+          if (!map.has(p.name)) {
+            map.set(p.name, { plugin: p });
+          }
+        }
+
+        const updatedPlugins: CheckUpdatedPlugin[] = Array.from(
+          map.values(),
+        ).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
 
         if (updatedPlugins.length === 0) {
           await this.#printMessage(
@@ -243,6 +259,28 @@ export class Ext extends BaseExt<Params> {
         await this.#denoCachePlugins(args.denops, args.extParams, plugins);
       },
     },
+    getFailed: {
+      description: "Get failed plugins",
+      callback: (_args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        actionParams: BaseParams;
+      }) => {
+        return this.#failedPlugins;
+      },
+    },
+    getLogs: {
+      description: "Get logs",
+      callback: (_args: {
+        denops: Denops;
+        options: DppOptions;
+        protocols: Record<ProtocolName, Protocol>;
+        actionParams: BaseParams;
+      }) => {
+        return this.#logs;
+      },
+    },
     getNotInstalled: {
       description: "Get not installed plugins",
       callback: async (args: {
@@ -282,26 +320,22 @@ export class Ext extends BaseExt<Params> {
         return plugins;
       },
     },
-    getFailed: {
-      description: "Get failed plugins",
-      callback: (_args: {
+    getRemoteUpdated: {
+      description: "Get remote updated plugins",
+      callback: async (args: {
         denops: Denops;
         options: DppOptions;
         protocols: Record<ProtocolName, Protocol>;
+        extParams: Params;
         actionParams: BaseParams;
       }) => {
-        return this.#failedPlugins;
-      },
-    },
-    getLogs: {
-      description: "Get logs",
-      callback: (_args: {
-        denops: Denops;
-        options: DppOptions;
-        protocols: Record<ProtocolName, Protocol>;
-        actionParams: BaseParams;
-      }) => {
-        return this.#logs;
+        const params = args.actionParams as InstallParams;
+        const plugins = (await this.#checkRemotePlugins(
+          args,
+          await getPlugins(args.denops, params.names ?? []),
+        )).map((updated) => updated.plugin);
+
+        return plugins;
       },
     },
     getUpdateLogs: {
@@ -1593,7 +1627,7 @@ async function saveRollbackFile(
   // Get revisions
   const revisions: Rollbacks = {};
   for (const plugin of await getPlugins(denops, [])) {
-    const protocol = protocols[plugin.protocol ?? ""];
+    const protocol = protocols[plugin?.protocol ?? ""];
     revisions[plugin.name] = await protocol.protocol.getRevision({
       denops: denops,
       plugin,

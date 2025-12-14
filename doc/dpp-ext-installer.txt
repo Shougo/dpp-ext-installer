@@ -73,8 +73,8 @@ checkNotUpdated
 			{force}:	Force update plugins if possible.
 					(Default: false)
 
-                                        *dpp-ext-installer-action-checkRemote*
-checkRemote
+                                 *dpp-ext-installer-action-checkRemoteUpdated*
+checkRemoteUpdated
 		Check updated plugins from remote repository. It does not use
 		Github API.
 		It does not return value but prompts whether update.
@@ -127,6 +127,17 @@ getNotUpdated
 		|dpp-ext-installer-action-update| but it is not perfect
 		solution. GitHub API cannot detect upstream changes
 		immediately.
+		NOTE: It must be executed by |dpp#sync_ext_action()|.
+
+		params:
+			{names}:	Plugin names.
+					(Default: [])
+
+                                   *dpp-ext-installer-action-getRemoteUpdated*
+getRemoteUpdated
+		Get remote updated plugins from remote repository.
+		NOTE: The update check is slower than
+		|dpp-ext-installer-action-getNotUpdated|.
 		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
 		params:
@@ -271,7 +282,12 @@ EXAMPLES                                          *dpp-ext-installer-examples*
 	\ #{ names: ['dpp.vim'] })
 
 	" Check not updated plugins
+	" NOTE: It uses github API
 	call dpp#async_ext_action('installer', 'checkNotUpdated')
+
+	" Check not updated plugins
+	" NOTE: It does not use github API
+	call dpp#async_ext_action('installer', 'checkRemote')
 
 	" Get not installed plugins
 	echo dpp#sync_ext_action('installer', 'getNotInstalled')
