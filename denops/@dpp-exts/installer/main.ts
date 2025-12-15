@@ -672,7 +672,11 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
-    const protocol = args.protocols[plugin.protocol ?? ""];
+    const protocolName = plugin.protocol ?? "";
+    if (protocolName.length === 0) {
+      return;
+    }
+    const protocol = args.protocols[protocolName];
 
     const oldRev = await protocol.protocol.getRevision({
       denops: args.denops,
@@ -958,7 +962,11 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
-    const protocol = args.protocols[plugin.protocol ?? ""];
+    const protocolName = plugin.protocol ?? "";
+    if (protocolName.length === 0) {
+      return;
+    }
+    const protocol = args.protocols[protocolName];
 
     const commands = await protocol.protocol.getCheckRemoteCommands({
       denops: args.denops,
@@ -1627,7 +1635,11 @@ async function saveRollbackFile(
   // Get revisions
   const revisions: Rollbacks = {};
   for (const plugin of await getPlugins(denops, [])) {
-    const protocol = protocols[plugin?.protocol ?? ""];
+    const protocolName = plugin.protocol ?? "";
+    if (protocolName.length === 0) {
+      continue;
+    }
+    const protocol = protocols[protocolName];
     revisions[plugin.name] = await protocol.protocol.getRevision({
       denops: denops,
       plugin,
