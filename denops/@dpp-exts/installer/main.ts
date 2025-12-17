@@ -45,8 +45,8 @@ export type InstallParams = {
 };
 
 export type CheckParams = {
-  names?: string[];
   force?: boolean;
+  names?: string[];
 };
 
 type UpdatedPlugin = {
@@ -60,6 +60,7 @@ type UpdatedPlugin = {
 };
 
 type CheckUpdatedPlugin = {
+  count?: number;
   plugin: Plugin;
   updated?: Date;
 };
@@ -935,7 +936,7 @@ export class Ext extends BaseExt<Params> {
     );
 
     return updatedPlugins.map((plugin) => {
-      return { plugin: plugin.plugin };
+      return { plugin: plugin.plugin, count: plugin.changesCount };
     });
   }
 
@@ -1503,6 +1504,8 @@ export class Ext extends BaseExt<Params> {
       const name = p.plugin.name.padEnd(maxNameLen);
       if (p.updated) {
         return `${name}: ${formatDate(p.updated)} (${timeAgo(p.updated)})`;
+      } else if (p.count) {
+        return `${name}: (${p.count} change${p.count === 1 ? "" : "s"})`;
       } else {
         return `${name}`;
       }
@@ -1511,10 +1514,13 @@ export class Ext extends BaseExt<Params> {
     const displayedLines = lines.length > 10
       ? [...lines.slice(0, 10), "..."]
       : lines;
+    const prompt = [
+      ...displayedLines,
+    ].join("\n");
 
     return await fn.confirm(
       denops,
-      `${["Updated plugins", "", ...displayedLines].join("\n")}\n\nUpdate now?`,
+      `${prompt}\n\nUpdate now?`,
       "yes\nNo",
       2,
     ) === 1;
