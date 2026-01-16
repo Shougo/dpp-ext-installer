@@ -991,7 +991,7 @@ export class Ext extends BaseExt<Params> {
       ).spawn();
 
       await pipeStream(stdout, (msg) => logMessage.push(msg));
-      pipeStream(
+      await pipeStream(
         stderr,
         this.#printError.bind(this, args.denops, args.extParams),
       );
