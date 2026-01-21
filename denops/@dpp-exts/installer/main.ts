@@ -164,6 +164,11 @@ export class Ext extends BaseExt<Params> {
             args.extParams,
             "Updated plugins are not found.",
           );
+
+          await args.denops.cmd(
+            "doautocmd User Dpp:ext:installer:updateDone",
+          );
+
           return;
         }
 
@@ -173,6 +178,10 @@ export class Ext extends BaseExt<Params> {
             updatedPlugins,
           );
           if (!check) {
+            await args.denops.cmd(
+              "doautocmd User Dpp:ext:installer:updateDone",
+            );
+
             return;
           }
         }
@@ -224,6 +233,11 @@ export class Ext extends BaseExt<Params> {
             args.extParams,
             "Updated plugins are not found.",
           );
+
+          await args.denops.cmd(
+            "doautocmd User Dpp:ext:installer:updateDone",
+          );
+
           return;
         }
 
@@ -233,6 +247,10 @@ export class Ext extends BaseExt<Params> {
             updatedPlugins,
           );
           if (!check) {
+            await args.denops.cmd(
+              "doautocmd User Dpp:ext:installer:updateDone",
+            );
+
             return;
           }
         }

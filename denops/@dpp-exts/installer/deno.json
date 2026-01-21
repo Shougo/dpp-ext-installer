@@ -12,7 +12,7 @@
     "@core/asyncutil": "jsr:@core/asyncutil@~1.2.0",
     "@denops/std": "jsr:@denops/std@~8.2.0",
     "@shougo/dpp-vim": "jsr:@shougo/dpp-vim@~5.3.0",
-    "@std/async": "jsr:@std/async@~1.0.7",
+    "@std/async": "jsr:@std/async@~1.1.0",
     "@std/streams": "jsr:@std/streams@~1.0.1"
   }
 }

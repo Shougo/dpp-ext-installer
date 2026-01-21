@@ -325,17 +325,24 @@ Q: I want to update from shell.
 
 A:
 
-For neovim: >
-	$ nvim --headless +'autocmd User Dpp:makeStatePost qall' \
+For neovim: >sh
+	$ nvim --headless +'autocmd User Dpp:ext:installer:updateDone qall' \
 	+'call dpp#async_ext_action("installer", "update")'
 <
-For Vim: >
-	$ vim -c 'autocmd User Dpp:makeStatePost qall' \
+Note: In neovim, messages are not shown.  It is known problem.
+
+For Vim: >sh
+	$ vim -c 'autocmd User Dpp:ext:installer:updateDone qall' \
 	-c 'call dpp#async_ext_action("installer", "update")' \
 	-Nu ~/.config/vim/vimrc -U NONE -i NONE -V1 -e -s
 <
 
-Note: In neovim, messages delimiters are broken.  It is known problem.
+It may be better for Neovim.
+
+For neovim: >sh
+	$ nvim +'autocmd User Dpp:ext:installer:updateDone qall' \
+	+'call dpp#async_ext_action("installer", "update")'
+<
 
                                                      *dpp-ext-installer-faq-3*
 Q: I want to quit Vim after updated plugins.
