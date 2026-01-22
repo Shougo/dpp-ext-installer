@@ -1,12 +1,11 @@
 function dpp#ext#installer#_print_message(msg) abort
-  const detect_shell = (has('nvim') && nvim_list_uis()->empty())
-          \ || (!has('nvim') && mode(v:true) ==# 'ce')
+  const detect_shell = s:is_headless_mode()
 
   for mes in s:msg2list(a:msg)
     echomsg '[dpp] ' .. mes
   endfor
 
-  if detect_shell
+  if s:is_headless_mode()
     " When it is executed from shell, new line is not added in ":echomsg".
     echo ''
   endif
@@ -16,6 +15,11 @@ function s:msg2list(expr) abort
 endfunction
 
 function dpp#ext#installer#_print_progress_message(msg) abort
+  if s:is_headless_mode()
+    " Don't create window for headless mode
+    return dpp#ext#installer#_print_message(a:msg)
+  endif
+
   if !exists('s:progress_winid') || s:progress_winid <= 0
     let s:progress_winid = s:new_progress_window()
   endif
@@ -28,6 +32,12 @@ function dpp#ext#installer#_print_progress_message(msg) abort
   endif
   call win_execute(s:progress_winid, "call cursor('$', 0) | redraw")
 endfunction
+
+function! s:is_headless_mode() abort
+  return (has('nvim') && nvim_list_uis()->empty())
+          \ || (!has('nvim') && mode(v:true) ==# 'ce')
+endfunction
+
 
 function dpp#ext#installer#_close_progress_window() abort
   if !exists('s:progress_winid') || s:progress_winid->winbufnr() < 0
