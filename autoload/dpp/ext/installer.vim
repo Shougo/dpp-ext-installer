@@ -3,11 +3,16 @@ function dpp#ext#installer#_print_message(msg) abort
 
   for mes in s:msg2list(a:msg)
     echomsg '[dpp] ' .. mes
+
+    if has('nvim') && detect_shell
+      " When it is executed from shell, new line is not added in ":echomsg".
+      echo "\n"
+    endif
   endfor
 
-  if s:is_headless_mode()
+  if !has('nvim') && detect_shell
     " When it is executed from shell, new line is not added in ":echomsg".
-    echo ''
+    echo ""
   endif
 endfunction
 function s:msg2list(expr) abort
@@ -37,7 +42,6 @@ function! s:is_headless_mode() abort
   return (has('nvim') && nvim_list_uis()->empty())
           \ || (!has('nvim') && mode(v:true) ==# 'ce')
 endfunction
-
 
 function dpp#ext#installer#_close_progress_window() abort
   if !exists('s:progress_winid') || s:progress_winid->winbufnr() < 0

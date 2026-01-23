@@ -329,19 +329,11 @@ For neovim: >sh
 	$ nvim --headless +'autocmd User Dpp:ext:installer:updateDone qall' \
 	+'call dpp#async_ext_action("installer", "update")'
 <
-Note: In neovim, messages are not shown.  It is known problem.
 
 For Vim: >sh
 	$ vim -c 'autocmd User Dpp:ext:installer:updateDone qall' \
 	-c 'call dpp#async_ext_action("installer", "update")' \
 	-Nu ~/.config/vim/vimrc -U NONE -i NONE -V1 -e -s
-<
-
-It may be better for Neovim.
-
-For neovim: >sh
-	$ nvim +'autocmd User Dpp:ext:installer:updateDone qall' \
-	+'call dpp#async_ext_action("installer", "update")'
 <
 
                                                      *dpp-ext-installer-faq-3*
