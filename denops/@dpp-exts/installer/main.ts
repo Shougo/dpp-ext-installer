@@ -20,7 +20,6 @@ import { batch } from "@denops/std/batch";
 import * as autocmd from "@denops/std/autocmd";
 import * as op from "@denops/std/option";
 import * as fn from "@denops/std/function";
-import * as vars from "@denops/std/variable";
 
 import { delay } from "@std/async/delay";
 import { TextLineStream } from "@std/streams/text-line-stream";
@@ -1088,8 +1087,8 @@ export class Ext extends BaseExt<Params> {
     }
 
     // Get the last updated time by rollbackfile timestamp.
-    const basePath = await vars.g.get(args.denops, "dpp#_base_path");
-    const name = await vars.g.get(args.denops, "dpp#_name");
+    const basePath = await args.denops.call("dpp#util#_get_base_path");
+    const name = await args.denops.call("dpp#util#_get_name");
     const rollbackDir = `${basePath}/${name}/rollbacks/latest`;
     const rollbackFile = `${rollbackDir}/rollback.json`;
     const rollbackStat = await safeStat(rollbackFile);
@@ -1188,8 +1187,8 @@ export class Ext extends BaseExt<Params> {
     }
 
     // Get the last updated time by rollbackfile timestamp.
-    const basePath = await vars.g.get(args.denops, "dpp#_base_path");
-    const name = await vars.g.get(args.denops, "dpp#_name");
+    const basePath = await args.denops.call("dpp#util#_get_base_path");
+    const name = await args.denops.call("dpp#util#_get_name");
     const rollbackDir = `${basePath}/${name}/rollbacks/latest`;
     const rollbackFile = `${rollbackDir}/rollback.json`;
     const rollbackStat = await safeStat(rollbackFile);
@@ -1607,12 +1606,7 @@ async function getPlugins(
   names: string[],
 ): Promise<Plugin[]> {
   // NOTE: Skip local plugins
-  let plugins = Object.values(
-    await vars.g.get(
-      denops,
-      "dpp#_plugins",
-    ),
-  ) as Plugin[];
+  let plugins = await denops.call("dpp#util#_get_plugins") as Plugin[];
 
   if (names.length > 0) {
     plugins = plugins.filter((plugin) => names.indexOf(plugin.name) >= 0);
@@ -1684,8 +1678,8 @@ async function saveRollbackFile(
   };
 
   // Save rollback file
-  const basePath = await vars.g.get(denops, "dpp#_base_path");
-  const name = await vars.g.get(denops, "dpp#_name");
+  const basePath = await denops.call("dpp#util#_get_base_path");
+  const name = await denops.call("dpp#util#_get_name");
   for (const date of ["latest", getFormattedDate(new Date())]) {
     const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
     await Deno.mkdir(rollbackDir, { recursive: true });
@@ -1701,8 +1695,8 @@ async function loadRollbackFile(
   // Get revisions
 
   // Save rollback file
-  const basePath = await vars.g.get(denops, "dpp#_base_path");
-  const name = await vars.g.get(denops, "dpp#_name");
+  const basePath = await denops.call("dpp#util#_get_base_path");
+  const name = await denops.call("dpp#util#_get_name");
   const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
   const rollbackFile = `${rollbackDir}/rollback.json`;
   if (!await safeStat(rollbackFile)) {
