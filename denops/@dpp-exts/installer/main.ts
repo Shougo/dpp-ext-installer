@@ -53,6 +53,8 @@ type UpdatedPlugin = {
   protocol: Protocol;
   newRev: string;
   oldRev: string;
+  newRevDate: Date | null;
+  oldRevDate: Date | null;
   url: string;
   logMessage: string;
   changesCount: number;
@@ -583,27 +585,14 @@ export class Ext extends BaseExt<Params> {
     }
 
     if (updatedPlugins.length > 0) {
-      const formatPlugin = (updated: UpdatedPlugin): string => {
-        const compareLink =
-          updated.oldRev !== "" && /^https?:\/\/github.com\//.test(updated.url)
-            ? `\n    ${
-              updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
-            }/compare/${updated.oldRev}...${updated.newRev}`
-            : "";
-        const changes = updated.changesCount === 0
-          ? ""
-          : `(${updated.changesCount} change${
-            updated.changesCount === 1 ? "" : "s"
-          })`;
-        return `  ${updated.plugin.name}${changes}${compareLink}`;
-      };
-
       await this.#printMessage(
         args.denops,
         args.extParams,
         "Updated plugins:\n" +
           `${
-            updatedPlugins.map((updated) => formatPlugin(updated)).join("\n")
+            updatedPlugins.map((updated) => formatPlugin(updated)).join(
+              "\n",
+            )
           }`,
       );
 
@@ -618,10 +607,10 @@ export class Ext extends BaseExt<Params> {
           args.denops,
           args.extParams,
           "Breaking updated plugins:\n" +
-            `${
-              breakingPlugins.map((updated) => "    " + updated.plugin.name)
+          `${
+              breakingPlugins.map((updated) => "  " + updated.plugin.name)
                 .join("\n")
-            }`,
+          }`,
         );
       }
 
@@ -832,11 +821,29 @@ export class Ext extends BaseExt<Params> {
           protocolParams: protocol.params,
         });
 
+        const oldRevDate = await protocol.protocol.getDateFromRevision({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+          rev: oldRev,
+        });
+
+        const newRevDate = await protocol.protocol.getDateFromRevision({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+          rev: newRev,
+        });
+
         updatedPlugins.push({
           plugin,
           protocol,
           oldRev,
           newRev,
+          oldRevDate,
+          newRevDate,
           url,
           logMessage,
           changesCount,
@@ -898,27 +905,14 @@ export class Ext extends BaseExt<Params> {
     ));
 
     if (updatedPlugins.length > 0) {
-      const formatPlugin = (updated: UpdatedPlugin): string => {
-        const compareLink =
-          updated.oldRev !== "" && /^https?:\/\/github.com\//.test(updated.url)
-            ? `\n    ${
-              updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
-            }/compare/${updated.oldRev}...${updated.newRev}`
-            : "";
-        const changes = updated.changesCount === 0
-          ? ""
-          : `(${updated.changesCount} change${
-            updated.changesCount === 1 ? "" : "s"
-          })`;
-        return `  ${updated.plugin.name}${changes}${compareLink}`;
-      };
-
       await this.#printMessage(
         args.denops,
         args.extParams,
         "Updated plugins:\n" +
           `${
-            updatedPlugins.map((updated) => formatPlugin(updated)).join("\n")
+            updatedPlugins.map((updated) => formatPlugin(updated)).join(
+              "\n",
+            )
           }`,
       );
 
@@ -933,10 +927,10 @@ export class Ext extends BaseExt<Params> {
           args.denops,
           args.extParams,
           "Breaking updated plugins:\n" +
-            `${
-              breakingPlugins.map((updated) => "    " + updated.plugin.name)
+          `${
+              breakingPlugins.map((updated) => "  " + updated.plugin.name)
                 .join("\n")
-            }`,
+          }`,
         );
       }
     }
@@ -1042,11 +1036,29 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
+      const oldRevDate = await protocol.protocol.getDateFromRevision({
+        denops: args.denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+        rev: oldRev,
+      });
+
+      const newRevDate = await protocol.protocol.getDateFromRevision({
+        denops: args.denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+        rev: newRev,
+      });
+
       updatedPlugins.push({
         plugin,
         protocol,
         oldRev,
         newRev,
+        oldRevDate,
+        newRevDate,
         url,
         logMessage: logMessage.join("\n"),
         changesCount: logMessage.length,
@@ -1473,38 +1485,6 @@ export class Ext extends BaseExt<Params> {
     denops: Denops,
     updatedPlugins: CheckUpdatedPlugin[],
   ): Promise<boolean> {
-    function timeAgo(d: Date, now = new Date()): string {
-      const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
-      if (diffSec < 0) return "just now";
-      if (diffSec < 60) {
-        const s = diffSec;
-        return `${s} second${s === 1 ? "" : "s"} ago`;
-      }
-      const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) {
-        const m = diffMin;
-        return `${m} minute${m === 1 ? "" : "s"} ago`;
-      }
-      const diffHour = Math.floor(diffMin / 60);
-      if (diffHour < 24) {
-        const h = diffHour;
-        return `${h} hour${h === 1 ? "" : "s"} ago`;
-      }
-      const diffDay = Math.floor(diffHour / 24);
-      if (diffDay < 30) {
-        const d = diffDay;
-        return `${d} day${d === 1 ? "" : "s"} ago`;
-      }
-      const diffMonth = Math.floor(diffDay / 30);
-      if (diffMonth < 12) {
-        const mo = diffMonth;
-        return `${mo} month${mo === 1 ? "" : "s"} ago`;
-      }
-      const diffYear = Math.floor(diffDay / 365);
-      const y = diffYear;
-      return `${y} year${y === 1 ? "" : "s"} ago`;
-    }
-
     // "YYYY-MM-DD HH:MM:SS"
     const formatDate = (d: Date) =>
       d.toISOString().replace("T", " ").slice(0, 19);
@@ -1745,4 +1725,56 @@ function extractGitHubRepo(repo: string): [string, string] | undefined {
   }
 
   return undefined;
+}
+
+function timeAgo(d: Date, now = new Date()): string {
+  const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+  if (diffSec < 0) return "just now";
+  if (diffSec < 60) {
+    const s = diffSec;
+    return `${s} second${s === 1 ? "" : "s"} ago`;
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    const m = diffMin;
+    return `${m} minute${m === 1 ? "" : "s"} ago`;
+  }
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) {
+    const h = diffHour;
+    return `${h} hour${h === 1 ? "" : "s"} ago`;
+  }
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 30) {
+    const d = diffDay;
+    return `${d} day${d === 1 ? "" : "s"} ago`;
+  }
+  const diffMonth = Math.floor(diffDay / 30);
+  if (diffMonth < 12) {
+    const mo = diffMonth;
+    return `${mo} month${mo === 1 ? "" : "s"} ago`;
+  }
+  const diffYear = Math.floor(diffDay / 365);
+  const y = diffYear;
+  return `${y} year${y === 1 ? "" : "s"} ago`;
+}
+
+function formatPlugin(updated: UpdatedPlugin): string {
+  const compareLink =
+    updated.oldRev !== "" && /^https?:\/\/github.com\//.test(updated.url)
+      ? `\n    ${
+        updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
+      }/compare/${updated.oldRev}...${updated.newRev}`
+      : "";
+  const changes = updated.changesCount === 0
+    ? ""
+    : `(${updated.changesCount} change${
+      updated.changesCount === 1 ? "" : "s"
+    })`;
+  const formatDate = (d: Date) =>
+    d.toISOString().replace("T", " ").slice(0, 19);
+  const date = `\n    ${
+    updated.oldRevDate ? formatDate(updated.oldRevDate) : ""
+  } (${updated.oldRevDate ? timeAgo(updated.oldRevDate) : ""})`;
+  return `  ${updated.plugin.name}${changes}${compareLink}${date}`;
 }
