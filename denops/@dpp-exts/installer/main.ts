@@ -1773,8 +1773,8 @@ function formatPlugin(updated: UpdatedPlugin): string {
     })`;
   const formatDate = (d: Date) =>
     d.toISOString().replace("T", " ").slice(0, 19);
-  const date = `\n    ${
-    updated.oldRevDate ? formatDate(updated.oldRevDate) : ""
-  } (${updated.oldRevDate ? timeAgo(updated.oldRevDate) : ""})`;
+  const date = updated.oldRevDate ? `\n    ${
+    formatDate(updated.oldRevDate)
+  } (timeAgo(updated.oldRevDate)})` : "";
   return `  ${updated.plugin.name}${changes}${compareLink}${date}`;
 }
