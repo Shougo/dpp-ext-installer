@@ -1775,6 +1775,6 @@ function formatPlugin(updated: UpdatedPlugin): string {
     d.toISOString().replace("T", " ").slice(0, 19);
   const date = updated.oldRevDate ? `\n    ${
     formatDate(updated.oldRevDate)
-  } (timeAgo(updated.oldRevDate)})` : "";
+  } (${timeAgo(updated.oldRevDate)})` : "";
   return `  ${updated.plugin.name}${changes}${compareLink}${date}`;
 }
