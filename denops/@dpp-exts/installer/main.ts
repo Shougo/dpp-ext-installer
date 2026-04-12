@@ -1103,9 +1103,11 @@ export class Ext extends BaseExt<Params> {
         if (!plugin.repo) return [];
         const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
         if (!owner || !name) return [];
-        // Sanitize to prevent GraphQL injection
-        const safeOwner = owner.replace(/["\n\r\\]/g, "");
-        const safeName = name.replace(/["\n\r\\]/g, "");
+        // Sanitize to prevent GraphQL injection (backslash must be escaped first)
+        const safeOwner = owner.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          .replace(/[\n\r]/g, "");
+        const safeName = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+          .replace(/[\n\r]/g, "");
         // NOTE: "repository" API is faster than "search" API
         return [
           `repo${index}: repository(owner:"${safeOwner}", name:"${safeName}"){ pushedAt }`,
@@ -1289,6 +1291,7 @@ export class Ext extends BaseExt<Params> {
             env: { NO_COLOR: "1" },
             stdout: "piped",
             stderr: "piped",
+            // plugin.path is a valid directory since plugin.path/denops was verified above
             cwd: plugin.path,
           },
         ).spawn();
@@ -1473,12 +1476,17 @@ export class Ext extends BaseExt<Params> {
       this.#cachedLogFilePathParam = protocolParams.logFilePath;
     }
 
+    if (!this.#cachedLogFilePath) {
+      return;
+    }
+
     try {
-      await Deno.writeTextFile(this.#cachedLogFilePath!, `${msg}\n`, {
+      await Deno.writeTextFile(this.#cachedLogFilePath, `${msg}\n`, {
         append: true,
       });
-    } catch {
-      // Ignore log file write errors to avoid disrupting the main flow
+    } catch (e) {
+      // Log to stderr to help users diagnose logging problems without disrupting the main flow
+      console.error(`[dpp-ext-installer] Failed to write log file: ${e}`);
     }
   }
 }
@@ -1535,24 +1543,20 @@ async function saveRollbackFile(
 ) {
   // Get revisions in parallel
   const plugins = await getPlugins(denops, []);
-  const entries = await Promise.all(
+  const revisions: Rollbacks = {};
+  await Promise.all(
     plugins.map(async (plugin) => {
       const protocolName = plugin.protocol ?? "";
-      if (protocolName.length === 0) return null;
+      if (protocolName.length === 0) return;
       const protocol = protocols[protocolName];
-      const rev = await protocol.protocol.getRevision({
+      revisions[plugin.name] = await protocol.protocol.getRevision({
         denops,
         plugin,
         protocolOptions: protocol.options,
         protocolParams: protocol.params,
       });
-      return [plugin.name, rev] as [string, string];
     }),
   );
-  const revisions: Rollbacks = {};
-  for (const entry of entries) {
-    if (entry) revisions[entry[0]] = entry[1];
-  }
 
   // Save rollback file
   const basePath = await denops.call("dpp#util#_get_base_path");
@@ -1579,8 +1583,11 @@ async function loadRollbackFile(
 
   try {
     return JSON.parse(await Deno.readTextFile(rollbackFile)) as Rollbacks;
-  } catch {
-    await printError(denops, `Failed to parse rollback file: ${rollbackFile}`);
+  } catch (e) {
+    await printError(
+      denops,
+      `Failed to parse rollback file: ${rollbackFile}: ${e}`,
+    );
     return {};
   }
 }
