@@ -350,7 +350,9 @@ export class Ext extends BaseExt<Params> {
               await this.#printError(
                 args.denops,
                 args.extParams,
-                `Failed to remove plugin directory: ${plugin.path}: ${e}`,
+                `Failed to remove plugin directory: ${plugin.path}: ${
+                  e instanceof Error ? e.message : String(e)
+                }`,
               );
             }
           }
@@ -1103,14 +1105,15 @@ export class Ext extends BaseExt<Params> {
         if (!plugin.repo) return [];
         const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
         if (!owner || !name) return [];
-        // Sanitize to prevent GraphQL injection (backslash must be escaped first)
-        const safeOwner = owner.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          .replace(/[\n\r]/g, "");
-        const safeName = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-          .replace(/[\n\r]/g, "");
+        // Validate owner and name against GitHub's allowed characters to prevent GraphQL injection.
+        // GitHub usernames/repo names only allow alphanumeric characters, hyphens, underscores, and dots.
+        if (
+          !/^[a-zA-Z0-9._-]+$/.test(owner) ||
+          !/^[a-zA-Z0-9._-]+$/.test(name)
+        ) return [];
         // NOTE: "repository" API is faster than "search" API
         return [
-          `repo${index}: repository(owner:"${safeOwner}", name:"${safeName}"){ pushedAt }`,
+          `repo${index}: repository(owner:"${owner}", name:"${name}"){ pushedAt }`,
         ];
       }).join("\n") + "\n}";
 
@@ -1274,9 +1277,9 @@ export class Ext extends BaseExt<Params> {
     }
 
     // Execute "deno cache" to optimize in parallel
-    const sem = new Semaphore(extParams.maxProcesses);
+    const semaphore = new Semaphore(extParams.maxProcesses);
     await Promise.all(plugins.map((plugin) =>
-      sem.lock(async () => {
+      semaphore.lock(async () => {
         if (
           !plugin.path || !await isDirectory(`${plugin.path}/denops`) ||
           plugin.name === "denops.vim"
@@ -1291,8 +1294,9 @@ export class Ext extends BaseExt<Params> {
             env: { NO_COLOR: "1" },
             stdout: "piped",
             stderr: "piped",
-            // plugin.path is a valid directory since plugin.path/denops was verified above
-            cwd: plugin.path,
+            // plugin.path is guaranteed non-null and is a valid directory
+            // because isDirectory(`${plugin.path}/denops`) was verified above
+            cwd: plugin.path!,
           },
         ).spawn();
 
@@ -1586,7 +1590,9 @@ async function loadRollbackFile(
   } catch (e) {
     await printError(
       denops,
-      `Failed to parse rollback file: ${rollbackFile}: ${e}`,
+      `Failed to parse rollback file: ${rollbackFile}: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
     );
     return {};
   }
