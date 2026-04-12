@@ -90,6 +90,8 @@ export class Ext extends BaseExt<Params> {
   #logs: string[] = [];
   #updateLogs: string[] = [];
   #updatedPlugins: Plugin[] = [];
+  #cachedLogFilePathParam: string | null = null;
+  #cachedLogFilePath: string | null = null;
 
   override async onInit(args: {
     denops: Denops;
@@ -143,55 +145,7 @@ export class Ext extends BaseExt<Params> {
           await getPlugins(args.denops, params.names ?? []),
         );
 
-        const notInstalled = await this.actions.getNotInstalled.callback(args);
-
-        const map = new Map<string, CheckUpdatedPlugin>();
-        for (const cp of checked) {
-          map.set(cp.plugin.name, cp);
-        }
-        for (const p of notInstalled) {
-          if (!map.has(p.name)) {
-            map.set(p.name, { plugin: p });
-          }
-        }
-
-        const updatedPlugins: CheckUpdatedPlugin[] = Array.from(
-          map.values(),
-        ).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
-
-        if (updatedPlugins.length === 0) {
-          await this.#printMessage(
-            args.denops,
-            args.extParams,
-            "Updated plugins are not found.",
-          );
-
-          await args.denops.cmd(
-            "doautocmd User Dpp:ext:installer:updateDone",
-          );
-
-          return;
-        }
-
-        if (!params.force) {
-          const check = await this.#displayUpdatedPlugins(
-            args.denops,
-            updatedPlugins,
-          );
-          if (!check) {
-            await args.denops.cmd(
-              "doautocmd User Dpp:ext:installer:updateDone",
-            );
-
-            return;
-          }
-        }
-
-        const plugins = await getPlugins(
-          args.denops,
-          updatedPlugins.map((updated) => updated.plugin.name),
-        );
-        await this.#updatePlugins(args, plugins, {});
+        await this.#promptAndUpdate(args, checked, params);
       },
     },
     checkRemoteUpdated: {
@@ -207,60 +161,12 @@ export class Ext extends BaseExt<Params> {
       }) => {
         const params = args.actionParams as CheckParams;
 
-        const checked: CheckUpdatedPlugin[] = (await this.#checkRemotePlugins(
+        const checked = await this.#checkRemotePlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
-        )).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
-
-        const notInstalled = await this.actions.getNotInstalled.callback(args);
-
-        const map = new Map<string, CheckUpdatedPlugin>();
-        for (const cp of checked) {
-          map.set(cp.plugin.name, cp);
-        }
-        for (const p of notInstalled) {
-          if (!map.has(p.name)) {
-            map.set(p.name, { plugin: p });
-          }
-        }
-
-        const updatedPlugins: CheckUpdatedPlugin[] = Array.from(
-          map.values(),
-        ).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
-
-        if (updatedPlugins.length === 0) {
-          await this.#printMessage(
-            args.denops,
-            args.extParams,
-            "Updated plugins are not found.",
-          );
-
-          await args.denops.cmd(
-            "doautocmd User Dpp:ext:installer:updateDone",
-          );
-
-          return;
-        }
-
-        if (!params.force) {
-          const check = await this.#displayUpdatedPlugins(
-            args.denops,
-            updatedPlugins,
-          );
-          if (!check) {
-            await args.denops.cmd(
-              "doautocmd User Dpp:ext:installer:updateDone",
-            );
-
-            return;
-          }
-        }
-
-        const plugins = await getPlugins(
-          args.denops,
-          updatedPlugins.map((updated) => updated.plugin.name),
         );
-        await this.#updatePlugins(args, plugins, {});
+
+        await this.#promptAndUpdate(args, checked, params);
       },
     },
     denoCache: {
@@ -332,7 +238,7 @@ export class Ext extends BaseExt<Params> {
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
-        const plugins = (await this.#checkUpdatedPlugins(
+        const plugins = (await this.#checkGithubUpdatedPlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
         )).map((updated) => updated.plugin);
@@ -438,7 +344,15 @@ export class Ext extends BaseExt<Params> {
         await Promise.all(plugins.map(async (plugin) => {
           // Remove plugin directory
           if (plugin.path && await isDirectory(plugin.path)) {
-            await Deno.remove(plugin.path, { recursive: true });
+            try {
+              await Deno.remove(plugin.path, { recursive: true });
+            } catch (e) {
+              await this.#printError(
+                args.denops,
+                args.extParams,
+                `Failed to remove plugin directory: ${plugin.path}: ${e}`,
+              );
+            }
           }
         }));
 
@@ -759,8 +673,13 @@ export class Ext extends BaseExt<Params> {
         this.#printError.bind(this, args.denops, args.extParams),
       );
 
-      const { success } = await status;
+      const { success, code } = await status;
       if (!success) {
+        await this.#printError(
+          args.denops,
+          args.extParams,
+          `Command failed with exit code ${code}: ${command.command}`,
+        );
         updateSuccess = false;
         break;
       }
@@ -1007,8 +926,13 @@ export class Ext extends BaseExt<Params> {
         this.#printError.bind(this, args.denops, args.extParams),
       );
 
-      const { success } = await status;
+      const { success, code } = await status;
       if (!success) {
+        await this.#printError(
+          args.denops,
+          args.extParams,
+          `Command failed with exit code ${code}: ${command.command}`,
+        );
         updateSuccess = false;
         break;
       }
@@ -1066,6 +990,68 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
+  async #promptAndUpdate(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      protocols: Record<ProtocolName, Protocol>;
+      extParams: Params;
+      actionParams: BaseParams;
+    },
+    checked: CheckUpdatedPlugin[],
+    params: CheckParams,
+  ) {
+    const notInstalled = await this.actions.getNotInstalled.callback(args);
+
+    const map = new Map<string, CheckUpdatedPlugin>();
+    for (const cp of checked) {
+      map.set(cp.plugin.name, cp);
+    }
+    for (const p of notInstalled) {
+      if (!map.has(p.name)) {
+        map.set(p.name, { plugin: p });
+      }
+    }
+
+    const updatedPlugins: CheckUpdatedPlugin[] = Array.from(
+      map.values(),
+    ).sort((a, b) => a.plugin.name.localeCompare(b.plugin.name));
+
+    if (updatedPlugins.length === 0) {
+      await this.#printMessage(
+        args.denops,
+        args.extParams,
+        "Updated plugins are not found.",
+      );
+
+      await args.denops.cmd(
+        "doautocmd User Dpp:ext:installer:updateDone",
+      );
+
+      return;
+    }
+
+    if (!params.force) {
+      const check = await this.#displayUpdatedPlugins(
+        args.denops,
+        updatedPlugins,
+      );
+      if (!check) {
+        await args.denops.cmd(
+          "doautocmd User Dpp:ext:installer:updateDone",
+        );
+
+        return;
+      }
+    }
+
+    const plugins = await getPlugins(
+      args.denops,
+      updatedPlugins.map((updated) => updated.plugin.name),
+    );
+    await this.#updatePlugins(args, plugins, {});
+  }
+
   async #checkGithubUpdatedPlugins(
     args: {
       denops: Denops;
@@ -1117,109 +1103,12 @@ export class Ext extends BaseExt<Params> {
         if (!plugin.repo) return [];
         const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
         if (!owner || !name) return [];
+        // Sanitize to prevent GraphQL injection
+        const safeOwner = owner.replace(/["\n\r\\]/g, "");
+        const safeName = name.replace(/["\n\r\\]/g, "");
         // NOTE: "repository" API is faster than "search" API
         return [
-          `repo${index}: repository(owner:"${owner}", name:"${name}"){ pushedAt }`,
-        ];
-      }).join("\n") + "\n}";
-
-    // POST github API
-    const resp = await fetch("https://api.github.com/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${args.extParams.githubAPIToken}`,
-      },
-      body: JSON.stringify({ query }),
-    });
-
-    if (!resp.ok) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        `Failed to fetch from GitHub GraphQL API: ${resp.statusText}`,
-      );
-      return [];
-    }
-
-    const result = await resp.json() as
-      | { data: Record<string, { pushedAt: string }> }
-      | { errors: { message: string }[] };
-
-    if ("errors" in result) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        `Failed to fetch from GitHub GraphQL API: ${result.errors[0].message}`,
-      );
-      return [];
-    }
-
-    return plugins
-      .map((plugin, index) => {
-        const pushedAt = result?.data?.[`repo${index}`]?.pushedAt;
-        const updated = pushedAt ? new Date(pushedAt) : undefined;
-        if (updated && updated > baseUpdated) {
-          return { plugin, updated } as CheckUpdatedPlugin;
-        }
-        return undefined;
-      }).filter((p): p is CheckUpdatedPlugin => p !== undefined);
-  }
-
-  async #checkUpdatedPlugins(
-    args: {
-      denops: Denops;
-      options: DppOptions;
-      extParams: Params;
-    },
-    plugins: Plugin[],
-  ): Promise<CheckUpdatedPlugin[]> {
-    if (plugins.length === 0) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "Target plugins are not found.",
-      );
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "You may have used the wrong plugin name," +
-          " or all of the plugins are already installed.",
-      );
-      return [];
-    }
-
-    if (args.extParams.githubAPIToken.length === 0) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        '"githubAPIToken" must be set.',
-      );
-      return [];
-    }
-
-    // Get the last updated time by rollbackfile timestamp.
-    const basePath = await args.denops.call("dpp#util#_get_base_path");
-    const name = await args.denops.call("dpp#util#_get_name");
-    const rollbackDir = `${basePath}/${name}/rollbacks/latest`;
-    const rollbackFile = `${rollbackDir}/rollback.json`;
-    const rollbackStat = await safeStat(rollbackFile);
-    const baseUpdated = rollbackStat ? rollbackStat.mtime : null;
-
-    if (!baseUpdated) {
-      // Not updated yet.
-      return [];
-    }
-
-    // Create query string.
-    const query = "query {\n" +
-      [...plugins.entries()].flatMap(([index, plugin]) => {
-        if (!plugin.repo) return [];
-        const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
-        if (!owner || !name) return [];
-        // NOTE: "repository" API is faster than "search" API
-        return [
-          `repo${index}: repository(owner:"${owner}", name:"${name}"){ pushedAt }`,
+          `repo${index}: repository(owner:"${safeOwner}", name:"${safeName}"){ pushedAt }`,
         ];
       }).join("\n") + "\n}";
 
@@ -1382,30 +1271,33 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
-    // Execute "deno cache" to optimize
-    for (const plugin of plugins) {
-      if (
-        !plugin.path || !await isDirectory(`${plugin.path}/denops`) ||
-        plugin.name === "denops.vim"
-      ) {
-        continue;
-      }
+    // Execute "deno cache" to optimize in parallel
+    const sem = new Semaphore(extParams.maxProcesses);
+    await Promise.all(plugins.map((plugin) =>
+      sem.lock(async () => {
+        if (
+          !plugin.path || !await isDirectory(`${plugin.path}/denops`) ||
+          plugin.name === "denops.vim"
+        ) {
+          return;
+        }
 
-      const { stdout, stderr, status } = new Deno.Command(
-        "deno",
-        {
-          args: ["cache", "--no-check", "--reload", "."],
-          env: { NO_COLOR: "1" },
-          stdout: "piped",
-          stderr: "piped",
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
-        },
-      ).spawn();
+        const { stdout, stderr, status } = new Deno.Command(
+          "deno",
+          {
+            args: ["cache", "--no-check", "--reload", "."],
+            env: { NO_COLOR: "1" },
+            stdout: "piped",
+            stderr: "piped",
+            cwd: plugin.path,
+          },
+        ).spawn();
 
-      pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
-      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-      await status;
-    }
+        pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
+        pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+        await status;
+      })
+    ));
   }
 
   async #revisionLockPlugin(
@@ -1573,11 +1465,21 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
-    const logFilePath = await denops.call(
-      "dpp#util#_expand",
-      protocolParams.logFilePath,
-    ) as string;
-    await Deno.writeTextFile(logFilePath, `${msg}\n`, { append: true });
+    if (this.#cachedLogFilePathParam !== protocolParams.logFilePath) {
+      this.#cachedLogFilePath = await denops.call(
+        "dpp#util#_expand",
+        protocolParams.logFilePath,
+      ) as string;
+      this.#cachedLogFilePathParam = protocolParams.logFilePath;
+    }
+
+    try {
+      await Deno.writeTextFile(this.#cachedLogFilePath!, `${msg}\n`, {
+        append: true,
+      });
+    } catch {
+      // Ignore log file write errors to avoid disrupting the main flow
+    }
   }
 }
 
@@ -1589,7 +1491,8 @@ async function getPlugins(
   let plugins = await denops.call("dpp#util#_get_plugins") as Plugin[];
 
   if (names.length > 0) {
-    plugins = plugins.filter((plugin) => names.indexOf(plugin.name) >= 0);
+    const namesSet = new Set(names);
+    plugins = plugins.filter((plugin) => namesSet.has(plugin.name));
   }
 
   return plugins;
@@ -1630,32 +1533,26 @@ async function saveRollbackFile(
   denops: Denops,
   protocols: Record<ProtocolName, Protocol>,
 ) {
-  // Get revisions
+  // Get revisions in parallel
+  const plugins = await getPlugins(denops, []);
+  const entries = await Promise.all(
+    plugins.map(async (plugin) => {
+      const protocolName = plugin.protocol ?? "";
+      if (protocolName.length === 0) return null;
+      const protocol = protocols[protocolName];
+      const rev = await protocol.protocol.getRevision({
+        denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+      });
+      return [plugin.name, rev] as [string, string];
+    }),
+  );
   const revisions: Rollbacks = {};
-  for (const plugin of await getPlugins(denops, [])) {
-    const protocolName = plugin.protocol ?? "";
-    if (protocolName.length === 0) {
-      continue;
-    }
-    const protocol = protocols[protocolName];
-    revisions[plugin.name] = await protocol.protocol.getRevision({
-      denops: denops,
-      plugin,
-      protocolOptions: protocol.options,
-      protocolParams: protocol.params,
-    });
+  for (const entry of entries) {
+    if (entry) revisions[entry[0]] = entry[1];
   }
-
-  const getFormattedDate = (date: Date): string => {
-    const year = date.getFullYear().toString().slice(-2);
-    const month = ("0" + (date.getMonth() + 1)).slice(-2);
-    const day = ("0" + date.getDate()).slice(-2);
-    const hours = ("0" + date.getHours()).slice(-2);
-    const minutes = ("0" + date.getMinutes()).slice(-2);
-    const seconds = ("0" + date.getSeconds()).slice(-2);
-
-    return year + month + day + hours + minutes + seconds;
-  };
 
   // Save rollback file
   const basePath = await denops.call("dpp#util#_get_base_path");
@@ -1672,9 +1569,6 @@ async function loadRollbackFile(
   denops: Denops,
   date: string,
 ): Promise<Record<string, string>> {
-  // Get revisions
-
-  // Save rollback file
   const basePath = await denops.call("dpp#util#_get_base_path");
   const name = await denops.call("dpp#util#_get_name");
   const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
@@ -1683,7 +1577,23 @@ async function loadRollbackFile(
     return {};
   }
 
-  return JSON.parse(await Deno.readTextFile(rollbackFile)) as Rollbacks;
+  try {
+    return JSON.parse(await Deno.readTextFile(rollbackFile)) as Rollbacks;
+  } catch {
+    await printError(denops, `Failed to parse rollback file: ${rollbackFile}`);
+    return {};
+  }
+}
+
+function getFormattedDate(date: Date): string {
+  const year = date.getFullYear().toString().slice(-2);
+  const month = ("0" + (date.getMonth() + 1)).slice(-2);
+  const day = ("0" + date.getDate()).slice(-2);
+  const hours = ("0" + date.getHours()).slice(-2);
+  const minutes = ("0" + date.getMinutes()).slice(-2);
+  const seconds = ("0" + date.getSeconds()).slice(-2);
+
+  return year + month + day + hours + minutes + seconds;
 }
 
 function pipeStream(
