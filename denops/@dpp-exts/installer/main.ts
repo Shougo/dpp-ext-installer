@@ -706,21 +706,22 @@ export class Ext extends BaseExt<Params> {
           protocolParams: protocol.params,
         });
 
-        const oldRevDate = await protocol.protocol.getDateFromRevision({
-          denops: args.denops,
-          plugin,
-          protocolOptions: protocol.options,
-          protocolParams: protocol.params,
-          rev: oldRev,
-        });
-
-        const newRevDate = await protocol.protocol.getDateFromRevision({
-          denops: args.denops,
-          plugin,
-          protocolOptions: protocol.options,
-          protocolParams: protocol.params,
-          rev: newRev,
-        });
+        const [oldRevDate, newRevDate] = await Promise.all([
+          protocol.protocol.getDateFromRevision({
+            denops: args.denops,
+            plugin,
+            protocolOptions: protocol.options,
+            protocolParams: protocol.params,
+            rev: oldRev,
+          }),
+          protocol.protocol.getDateFromRevision({
+            denops: args.denops,
+            plugin,
+            protocolOptions: protocol.options,
+            protocolParams: protocol.params,
+            rev: newRev,
+          }),
+        ]);
 
         updatedPlugins.push({
           plugin,
@@ -879,35 +880,37 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
-      const oldRev = await protocol.protocol.getRevision({
-        denops: args.denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-      });
+      const [oldRev, newRev] = await Promise.all([
+        protocol.protocol.getRevision({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+        }),
+        protocol.protocol.getRemoteRevision({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+        }),
+      ]);
 
-      const newRev = await protocol.protocol.getRemoteRevision({
-        denops: args.denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-      });
-
-      const oldRevDate = await protocol.protocol.getDateFromRevision({
-        denops: args.denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-        rev: oldRev,
-      });
-
-      const newRevDate = await protocol.protocol.getDateFromRevision({
-        denops: args.denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-        rev: newRev,
-      });
+      const [oldRevDate, newRevDate] = await Promise.all([
+        protocol.protocol.getDateFromRevision({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+          rev: oldRev,
+        }),
+        protocol.protocol.getDateFromRevision({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+          rev: newRev,
+        }),
+      ]);
 
       updatedPlugins.push({
         plugin,
@@ -1468,7 +1471,11 @@ async function outputCheckDiff(denops: Denops, output: string[]) {
 
   await batch(denops, async (denops: Denops) => {
     await fn.setbufvar(denops, bufnr, "&modifiable", true);
-    await fn.appendbufline(denops, bufnr, "$", output);
+    const CHUNK = 500;
+    for (let i = 0; i < output.length; i += CHUNK) {
+      const chunk = output.slice(i, i + CHUNK);
+      await fn.appendbufline(denops, bufnr, "$", chunk);
+    }
     await fn.setbufvar(denops, bufnr, "&modifiable", false);
   });
 }
