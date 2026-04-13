@@ -501,34 +501,11 @@ export class Ext extends BaseExt<Params> {
     }
 
     if (updatedPlugins.length > 0) {
-      await this.#printMessage(
+      await this.#printUpdatedPlugins(
         args.denops,
         args.extParams,
-        "Updated plugins:\n" +
-          `${
-            updatedPlugins.map((updated) => formatPlugin(updated)).join(
-              "\n",
-            )
-          }`,
+        updatedPlugins,
       );
-
-      // If it has breaking changes commit message
-      // https://www.conventionalcommits.org/en/v1.0.0/
-      const breakingPlugins = updatedPlugins.filter(
-        (updated) => updated.logMessage.match(/.*!.*:|BREAKING CHANGE:/),
-      );
-
-      if (breakingPlugins.length > 0) {
-        await this.#printMessage(
-          args.denops,
-          args.extParams,
-          "Breaking updated plugins:\n" +
-            `${
-              breakingPlugins.map((updated) => "  " + updated.plugin.name)
-                .join("\n")
-            }`,
-        );
-      }
 
       await saveRollbackFile(args.denops, args.protocols);
     }
@@ -656,27 +633,13 @@ export class Ext extends BaseExt<Params> {
     // Execute commands
     let updateSuccess = true;
     for (const command of commands) {
-      const isDir = await isDirectory(plugin.path ?? "");
-      const { stdout, stderr, status } = new Deno.Command(
-        command.command,
-        {
-          args: command.args,
-          cwd: isDir ? plugin.path : Deno.cwd(),
-          stdout: "piped",
-          stderr: "piped",
-        },
-      ).spawn();
-
-      pipeStream(
-        stdout,
+      const { success, code } = await this.#runCommand(
+        args.denops,
+        args.extParams,
+        plugin,
+        command,
         this.#printProgress.bind(this, args.denops, args.extParams),
       );
-      pipeStream(
-        stderr,
-        this.#printError.bind(this, args.denops, args.extParams),
-      );
-
-      const { success, code } = await status;
       if (!success) {
         await this.#printError(
           args.denops,
@@ -827,34 +790,11 @@ export class Ext extends BaseExt<Params> {
     ));
 
     if (updatedPlugins.length > 0) {
-      await this.#printMessage(
+      await this.#printUpdatedPlugins(
         args.denops,
         args.extParams,
-        "Updated plugins:\n" +
-          `${
-            updatedPlugins.map((updated) => formatPlugin(updated)).join(
-              "\n",
-            )
-          }`,
+        updatedPlugins,
       );
-
-      // If it has breaking changes commit message
-      // https://www.conventionalcommits.org/en/v1.0.0/
-      const breakingPlugins = updatedPlugins.filter(
-        (updated) => updated.logMessage.match(/.*!.*:|BREAKING CHANGE:/),
-      );
-
-      if (breakingPlugins.length > 0) {
-        await this.#printMessage(
-          args.denops,
-          args.extParams,
-          "Breaking updated plugins:\n" +
-            `${
-              breakingPlugins.map((updated) => "  " + updated.plugin.name)
-                .join("\n")
-            }`,
-        );
-      }
     }
 
     await args.denops.call("dpp#ext#installer#_close_progress_window");
@@ -913,24 +853,13 @@ export class Ext extends BaseExt<Params> {
     let updateSuccess = true;
     const logMessage: string[] = [];
     for (const command of commands) {
-      const isDir = await isDirectory(plugin.path ?? "");
-      const { stdout, stderr, status } = new Deno.Command(
-        command.command,
-        {
-          args: command.args,
-          cwd: isDir ? plugin.path : Deno.cwd(),
-          stdout: "piped",
-          stderr: "piped",
-        },
-      ).spawn();
-
-      await pipeStream(stdout, (msg) => logMessage.push(msg));
-      await pipeStream(
-        stderr,
-        this.#printError.bind(this, args.denops, args.extParams),
+      const { success, code } = await this.#runCommand(
+        args.denops,
+        args.extParams,
+        plugin,
+        command,
+        (msg) => logMessage.push(msg),
       );
-
-      const { success, code } = await status;
       if (!success) {
         await this.#printError(
           args.denops,
@@ -1185,20 +1114,13 @@ export class Ext extends BaseExt<Params> {
 
     const logMessage: string[] = [];
     for (const command of commands) {
-      const isDir = await isDirectory(plugin.path ?? "");
-      const { stdout, stderr, status } = new Deno.Command(
-        command.command,
-        {
-          args: command.args,
-          cwd: isDir ? plugin.path : Deno.cwd(),
-          stdout: "piped",
-          stderr: "piped",
-        },
-      ).spawn();
-
-      await pipeStream(stdout, (msg) => logMessage.push(msg));
-      await pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-      await status;
+      await this.#runCommand(
+        denops,
+        extParams,
+        plugin,
+        command,
+        (msg) => logMessage.push(msg),
+      );
     }
 
     return logMessage.join("\n");
@@ -1227,20 +1149,13 @@ export class Ext extends BaseExt<Params> {
 
     let changesCount = 0;
     for (const command of commands) {
-      const isDir = await isDirectory(plugin.path ?? "");
-      const { stdout, stderr, status } = new Deno.Command(
-        command.command,
-        {
-          args: command.args,
-          cwd: isDir ? plugin.path : Deno.cwd(),
-          stdout: "piped",
-          stderr: "piped",
-        },
-      ).spawn();
-
-      await pipeStream(stdout, (msg) => changesCount = parseInt(msg, 10));
-      await pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-      await status;
+      await this.#runCommand(
+        denops,
+        extParams,
+        plugin,
+        command,
+        (msg) => { changesCount = parseInt(msg, 10); },
+      );
     }
 
     return changesCount;
@@ -1329,20 +1244,13 @@ export class Ext extends BaseExt<Params> {
     });
 
     for (const command of commands) {
-      const isDir = await isDirectory(plugin.path ?? "");
-      const { stdout, stderr, status } = new Deno.Command(
-        command.command,
-        {
-          args: command.args,
-          cwd: isDir ? plugin.path : Deno.cwd(),
-          stdout: "piped",
-          stderr: "piped",
-        },
-      ).spawn();
-
-      pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
-      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-      await status;
+      await this.#runCommand(
+        denops,
+        extParams,
+        plugin,
+        command,
+        this.#printProgress.bind(this, denops, extParams),
+      );
     }
   }
 
@@ -1369,21 +1277,69 @@ export class Ext extends BaseExt<Params> {
 
     for (const command of commands) {
       const output: string[] = [];
-      const isDir = await isDirectory(plugin.path ?? "");
-      const { stdout, stderr, status } = new Deno.Command(
-        command.command,
-        {
-          args: command.args,
-          cwd: isDir ? plugin.path : Deno.cwd(),
-          stdout: "piped",
-          stderr: "piped",
-        },
-      ).spawn();
-
-      pipeStream(stdout, (msg) => msg && output.push(msg));
-      pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-      await status.then(() => outputCheckDiff(denops, output));
+      await this.#runCommand(
+        denops,
+        extParams,
+        plugin,
+        command,
+        (msg) => { if (msg) output.push(msg); },
+      );
+      await outputCheckDiff(denops, output);
     }
+  }
+
+  async #printUpdatedPlugins(
+    denops: Denops,
+    extParams: Params,
+    updatedPlugins: UpdatedPlugin[],
+  ) {
+    await this.#printMessage(
+      denops,
+      extParams,
+      "Updated plugins:\n" +
+        `${updatedPlugins.map((updated) => formatPlugin(updated)).join("\n")}`,
+    );
+
+    // If it has breaking changes commit message
+    // https://www.conventionalcommits.org/en/v1.0.0/
+    const breakingPlugins = updatedPlugins.filter(
+      (updated) => updated.logMessage.match(/.*!.*:|BREAKING CHANGE:/),
+    );
+
+    if (breakingPlugins.length > 0) {
+      await this.#printMessage(
+        denops,
+        extParams,
+        "Breaking updated plugins:\n" +
+          `${
+            breakingPlugins.map((updated) => "  " + updated.plugin.name)
+              .join("\n")
+          }`,
+      );
+    }
+  }
+
+  async #runCommand(
+    denops: Denops,
+    extParams: Params,
+    plugin: Plugin,
+    command: { command: string; args: string[] },
+    onStdout: (msg: string) => unknown | Promise<unknown>,
+  ): Promise<{ success: boolean; code: number }> {
+    const isDir = await isDirectory(plugin.path ?? "");
+    const { stdout, stderr, status } = new Deno.Command(
+      command.command,
+      {
+        args: command.args,
+        cwd: isDir ? plugin.path : Deno.cwd(),
+        stdout: "piped",
+        stderr: "piped",
+      },
+    ).spawn();
+
+    await pipeStream(stdout, onStdout);
+    await pipeStream(stderr, this.#printError.bind(this, denops, extParams));
+    return await status;
   }
 
   async #updatedCheck(
