@@ -22,6 +22,10 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ env.DENO_VERSION }}
+      - name: Check
+        run: deno check denops/**/*.ts
+      - name: Lint
+        run: deno lint denops
       - name: Publish
         run: |
           deno run -A jsr:@david/publish-on-tag@0.2.0

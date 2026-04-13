@@ -5,7 +5,7 @@
   },
   "publish": {
     "include": [
-      "**/*.ts"
+      "main.ts"
     ]
   },
   "imports": {
