@@ -174,10 +174,7 @@ export class Ext extends BaseExt<Params> {
         }
 
         if (!params.force) {
-          const check = await this.#displayUpdatedPlugins(
-            args.denops,
-            updatedPlugins,
-          );
+          const check = await this.#updatedCheck(args.denops);
           if (!check) {
             await args.denops.cmd(
               "doautocmd User Dpp:ext:installer:updateDone",
@@ -243,10 +240,7 @@ export class Ext extends BaseExt<Params> {
         }
 
         if (!params.force) {
-          const check = await this.#displayUpdatedPlugins(
-            args.denops,
-            updatedPlugins,
-          );
+          const check = await this.#updatedCheck(args.denops);
           if (!check) {
             await args.denops.cmd(
               "doautocmd User Dpp:ext:installer:updateDone",
@@ -607,10 +601,10 @@ export class Ext extends BaseExt<Params> {
           args.denops,
           args.extParams,
           "Breaking updated plugins:\n" +
-          `${
+            `${
               breakingPlugins.map((updated) => "  " + updated.plugin.name)
                 .join("\n")
-          }`,
+            }`,
         );
       }
 
@@ -927,10 +921,10 @@ export class Ext extends BaseExt<Params> {
           args.denops,
           args.extParams,
           "Breaking updated plugins:\n" +
-          `${
+            `${
               breakingPlugins.map((updated) => "  " + updated.plugin.name)
                 .join("\n")
-          }`,
+            }`,
         );
       }
     }
@@ -1481,43 +1475,12 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
-  async #displayUpdatedPlugins(
+  async #updatedCheck(
     denops: Denops,
-    updatedPlugins: CheckUpdatedPlugin[],
   ): Promise<boolean> {
-    // "YYYY-MM-DD HH:MM:SS"
-    const formatDate = (d: Date) =>
-      d.toISOString().replace("T", " ").slice(0, 19);
-
-    const sorted = [...updatedPlugins].sort(
-      (a, b) => a.plugin.name.localeCompare(b.plugin.name),
-    );
-    const maxNameLen = sorted.reduce(
-      (m, p) => Math.max(m, p.plugin.name.length),
-      0,
-    );
-
-    const lines = sorted.map((p) => {
-      const name = p.plugin.name.padEnd(maxNameLen);
-      if (p.updated) {
-        return `${name}: ${formatDate(p.updated)} (${timeAgo(p.updated)})`;
-      } else if (p.count) {
-        return `${name}: (${p.count} change${p.count === 1 ? "" : "s"})`;
-      } else {
-        return `${name}`;
-      }
-    });
-
-    const displayedLines = lines.length > 10
-      ? [...lines.slice(0, 10), "..."]
-      : lines;
-    const prompt = [
-      ...displayedLines,
-    ].join("\n");
-
     return await fn.confirm(
       denops,
-      `${prompt}\n\nUpdate now?`,
+      `Update now?`,
       "yes\nNo",
       2,
     ) === 1;
@@ -1773,8 +1736,8 @@ function formatPlugin(updated: UpdatedPlugin): string {
     })`;
   const formatDate = (d: Date) =>
     d.toISOString().replace("T", " ").slice(0, 19);
-  const date = updated.oldRevDate ? `\n    ${
-    formatDate(updated.oldRevDate)
-  } (${timeAgo(updated.oldRevDate)})` : "";
+  const date = updated.oldRevDate
+    ? `\n    ${formatDate(updated.oldRevDate)} (${timeAgo(updated.oldRevDate)})`
+    : "";
   return `  ${updated.plugin.name}${changes}${compareLink}${date}`;
 }
