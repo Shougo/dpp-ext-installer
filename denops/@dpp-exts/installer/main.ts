@@ -656,11 +656,12 @@ export class Ext extends BaseExt<Params> {
     // Execute commands
     let updateSuccess = true;
     for (const command of commands) {
+      const isDir = await isDirectory(plugin.path ?? "");
       const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          cwd: isDir ? plugin.path : Deno.cwd(),
           stdout: "piped",
           stderr: "piped",
         },
@@ -912,11 +913,12 @@ export class Ext extends BaseExt<Params> {
     let updateSuccess = true;
     const logMessage: string[] = [];
     for (const command of commands) {
+      const isDir = await isDirectory(plugin.path ?? "");
       const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          cwd: isDir ? plugin.path : Deno.cwd(),
           stdout: "piped",
           stderr: "piped",
         },
@@ -995,8 +997,10 @@ export class Ext extends BaseExt<Params> {
   async #promptAndUpdate(
     args: {
       denops: Denops;
+      context: Context;
       options: DppOptions;
       protocols: Record<ProtocolName, Protocol>;
+      extOptions: ExtOptions;
       extParams: Params;
       actionParams: BaseParams;
     },
@@ -1102,8 +1106,9 @@ export class Ext extends BaseExt<Params> {
         if (!plugin.repo) return [];
         const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
         if (!owner || !name) return [];
-        // Validate owner and name against GitHub's allowed characters to prevent GraphQL injection.
-        // GitHub usernames/repo names only allow alphanumeric characters, hyphens, underscores, and dots.
+        // Validate owner and name against GitHub's allowed characters to
+        // prevent GraphQL injection. GitHub usernames/repo names only allow
+        // alphanumeric characters, hyphens, underscores, and dots.
         if (
           !/^[a-zA-Z0-9._-]+$/.test(owner) ||
           !/^[a-zA-Z0-9._-]+$/.test(name)
@@ -1180,11 +1185,12 @@ export class Ext extends BaseExt<Params> {
 
     const logMessage: string[] = [];
     for (const command of commands) {
+      const isDir = await isDirectory(plugin.path ?? "");
       const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          cwd: isDir ? plugin.path : Deno.cwd(),
           stdout: "piped",
           stderr: "piped",
         },
@@ -1221,11 +1227,12 @@ export class Ext extends BaseExt<Params> {
 
     let changesCount = 0;
     for (const command of commands) {
+      const isDir = await isDirectory(plugin.path ?? "");
       const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          cwd: isDir ? plugin.path : Deno.cwd(),
           stdout: "piped",
           stderr: "piped",
         },
@@ -1322,11 +1329,12 @@ export class Ext extends BaseExt<Params> {
     });
 
     for (const command of commands) {
+      const isDir = await isDirectory(plugin.path ?? "");
       const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          cwd: isDir ? plugin.path : Deno.cwd(),
           stdout: "piped",
           stderr: "piped",
         },
@@ -1361,11 +1369,12 @@ export class Ext extends BaseExt<Params> {
 
     for (const command of commands) {
       const output: string[] = [];
+      const isDir = await isDirectory(plugin.path ?? "");
       const { stdout, stderr, status } = new Deno.Command(
         command.command,
         {
           args: command.args,
-          cwd: await isDirectory(plugin.path ?? "") ? plugin.path : Deno.cwd(),
+          cwd: isDir ? plugin.path : Deno.cwd(),
           stdout: "piped",
           stderr: "piped",
         },
@@ -1455,7 +1464,8 @@ export class Ext extends BaseExt<Params> {
         append: true,
       });
     } catch (e) {
-      // Log to stderr to help users diagnose logging problems without disrupting the main flow
+      // Log to stderr to help users diagnose logging problems without
+      // disrupting the main flow
       console.error(`[dpp-ext-installer] Failed to write log file: ${e}`);
     }
   }
