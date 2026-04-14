@@ -30,11 +30,9 @@ https://github.com/Shougo/dpp.vim
 	\ #{ names: ['dpp.vim'] })
 
 	" Check not updated plugins
-    " NOTE: It uses github API
 	call dpp#async_ext_action('installer', 'checkNotUpdated')
 
-	" Check not updated plugins
-    " NOTE: It does not use github API
+	" Check not updated plugins (protocol-based)
 	call dpp#async_ext_action('installer', 'checkRemoteUpdated')
 
 	" Get not installed plugins
