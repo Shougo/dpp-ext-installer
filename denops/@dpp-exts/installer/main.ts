@@ -224,7 +224,7 @@ export class Ext extends BaseExt<Params> {
           ),
         );
 
-        return plugins.filter((_) => bits.shift());
+        return plugins.filter((_, i) => bits[i]);
       },
     },
     getNotUpdated: {
@@ -309,7 +309,7 @@ export class Ext extends BaseExt<Params> {
 
         await this.#updatePlugins(
           args,
-          plugins.filter((_) => bits.shift()),
+          plugins.filter((_, i) => bits[i]),
           revisions,
         );
       },
@@ -1379,21 +1379,24 @@ async function saveRollbackFile(
   denops: Denops,
   protocols: Record<ProtocolName, Protocol>,
 ) {
-  // Get revisions in parallel
+  // Get revisions with limited concurrency to avoid excessive IO/processes
   const plugins = await getPlugins(denops, []);
   const revisions: Rollbacks = {};
+  const sem = new Semaphore(5);
   await Promise.all(
-    plugins.map(async (plugin) => {
-      const protocolName = plugin.protocol ?? "";
-      if (protocolName.length === 0) return;
-      const protocol = protocols[protocolName];
-      revisions[plugin.name] = await protocol.protocol.getRevision({
-        denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-      });
-    }),
+    plugins.map((plugin) =>
+      sem.lock(async () => {
+        const protocolName = plugin.protocol ?? "";
+        if (protocolName.length === 0) return;
+        const protocol = protocols[protocolName];
+        revisions[plugin.name] = await protocol.protocol.getRevision({
+          denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+        });
+      })
+    ),
   );
 
   // Save rollback file
