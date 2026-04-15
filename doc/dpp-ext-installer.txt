@@ -57,15 +57,9 @@ build
 
                                     *dpp-ext-installer-action-checkNotUpdated*
 checkNotUpdated
-		Check not updated or not installed plugins by GitHub GraqhQL
-		API. (https://docs.github.com/en/graphql)
+		Check not updated or not installed plugins via the protocol
+		(same as |dpp-ext-installer-action-checkRemoteUpdated|).
 		It does not return value but prompts whether update.
-		NOTE: It is available for GitHub plugins only.
-		NOTE: |dpp-ext-installer-param-githubAPIToken| must be set.
-		NOTE: The update check is quicker than
-		|dpp-ext-installer-action-update| but it is not perfect
-		solution. GitHub API cannot detect upstream changes
-		immediately.
 
 		params:
 			{names}:	Plugin names.
@@ -75,11 +69,8 @@ checkNotUpdated
 
                                  *dpp-ext-installer-action-checkRemoteUpdated*
 checkRemoteUpdated
-		Check updated plugins from remote repository. It does not use
-		Github API.
+		Check updated plugins from remote repository.
 		It does not return value but prompts whether update.
-		NOTE: The update check is slower than
-		|dpp-ext-installer-action-checkNotUpdated|.
 
 		params:
 			{names}:	Plugin names.
@@ -119,14 +110,8 @@ getNotInstalled
 
                                       *dpp-ext-installer-action-getNotUpdated*
 getNotUpdated
-		Get not updated plugins by GitHub GraqhQL API.
-		https://docs.github.com/en/graphql.
-		NOTE: It is available for GitHub plugins only.
-		NOTE: |dpp-ext-installer-param-githubAPIToken| must be set.
-		NOTE: The update check is quicker than
-		|dpp-ext-installer-action-update| but it is not perfect
-		solution. GitHub API cannot detect upstream changes
-		immediately.
+		Get not updated plugins via the protocol
+		(same as |dpp-ext-installer-action-getRemoteUpdated|).
 		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
 		params:
@@ -136,8 +121,6 @@ getNotUpdated
                                    *dpp-ext-installer-action-getRemoteUpdated*
 getRemoteUpdated
 		Get remote updated plugins from remote repository.
-		NOTE: The update check is slower than
-		|dpp-ext-installer-action-getNotUpdated|.
 		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
 		params:
@@ -227,14 +210,6 @@ checkDiff
 
 		Defaults: v:false
 
-                                      *dpp-ext-installer-param-githubAPIToken*
-githubAPIToken
-		GitHub API token used for
-		|dpp-ext-installer-action-checkNotUpdated| and
-		|dpp-ext-installer-action-getNotUpdated|.
-
-		Defaults: ""
-
                                          *dpp-ext-installer-param-logFilePath*
 logFilePath
 		The log file output path.
@@ -282,12 +257,10 @@ EXAMPLES                                          *dpp-ext-installer-examples*
 	\ #{ names: ['dpp.vim'] })
 
 	" Check not updated plugins
-	" NOTE: It uses github API
 	call dpp#async_ext_action('installer', 'checkNotUpdated')
 
-	" Check not updated plugins
-	" NOTE: It does not use github API
-	call dpp#async_ext_action('installer', 'checkRemote')
+	" Check not updated plugins (protocol-based)
+	call dpp#async_ext_action('installer', 'checkRemoteUpdated')
 
 	" Get not installed plugins
 	echo dpp#sync_ext_action('installer', 'getNotInstalled')
@@ -376,6 +349,12 @@ A: >vim
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
+
+2026.04.14
+* "checkNotUpdated" and "getNotUpdated" now use the protocol-based check
+  (same behaviour as "checkRemoteUpdated"/"getRemoteUpdated"). The GitHub
+  GraphQL update check has been removed.
+* "dpp-ext-installer-param-githubAPIToken" is removed.
 
 2025.09.01
 * "dpp-ext-installer-param-enableDenoCache" is removed.

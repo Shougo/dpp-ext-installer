@@ -27,7 +27,6 @@ import { Semaphore } from "@core/asyncutil/semaphore";
 
 export type Params = {
   checkDiff: boolean;
-  githubAPIToken: string;
   logFilePath: string;
   maxProcesses: number;
   wait: number;
@@ -140,7 +139,7 @@ export class Ext extends BaseExt<Params> {
       }) => {
         const params = args.actionParams as CheckParams;
 
-        const checked = await this.#checkGithubUpdatedPlugins(
+        const checked = await this.#checkRemotePlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
         );
@@ -238,7 +237,7 @@ export class Ext extends BaseExt<Params> {
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
-        const plugins = (await this.#checkGithubUpdatedPlugins(
+        const plugins = (await this.#checkRemotePlugins(
           args,
           await getPlugins(args.denops, params.names ?? []),
         )).map((updated) => updated.plugin);
@@ -391,7 +390,6 @@ export class Ext extends BaseExt<Params> {
   override params(): Params {
     return {
       checkDiff: false,
-      githubAPIToken: "",
       logFilePath: "",
       maxProcesses: 5,
       wait: 0,
@@ -987,113 +985,6 @@ export class Ext extends BaseExt<Params> {
     await this.#updatePlugins(args, plugins, {});
   }
 
-  async #checkGithubUpdatedPlugins(
-    args: {
-      denops: Denops;
-      options: DppOptions;
-      extParams: Params;
-    },
-    plugins: Plugin[],
-  ): Promise<CheckUpdatedPlugin[]> {
-    if (plugins.length === 0) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "Target plugins are not found.",
-      );
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "You may have used the wrong plugin name," +
-          " or all of the plugins are already installed.",
-      );
-      return [];
-    }
-
-    if (args.extParams.githubAPIToken.length === 0) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        '"githubAPIToken" must be set.',
-      );
-      return [];
-    }
-
-    // Get the last updated time by rollbackfile timestamp.
-    const basePath = await args.denops.call("dpp#util#_get_base_path");
-    const name = await args.denops.call("dpp#util#_get_name");
-    const rollbackDir = `${basePath}/${name}/rollbacks/latest`;
-    const rollbackFile = `${rollbackDir}/rollback.json`;
-    const rollbackStat = await safeStat(rollbackFile);
-    const baseUpdated = rollbackStat ? rollbackStat.mtime : null;
-
-    if (!baseUpdated) {
-      // Not updated yet.
-      return [];
-    }
-
-    // Create query string.
-    const query = "query {\n" +
-      [...plugins.entries()].flatMap(([index, plugin]) => {
-        if (!plugin.repo) return [];
-        const [owner, name] = extractGitHubRepo(plugin.repo) ?? [];
-        if (!owner || !name) return [];
-        // Validate owner and name against GitHub's allowed characters to
-        // prevent GraphQL injection. GitHub usernames/repo names only allow
-        // alphanumeric characters, hyphens, underscores, and dots.
-        if (
-          !/^[a-zA-Z0-9._-]+$/.test(owner) ||
-          !/^[a-zA-Z0-9._-]+$/.test(name)
-        ) return [];
-        // NOTE: "repository" API is faster than "search" API
-        return [
-          `repo${index}: repository(owner:"${owner}", name:"${name}"){ pushedAt }`,
-        ];
-      }).join("\n") + "\n}";
-
-    // POST github API
-    const resp = await fetch("https://api.github.com/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${args.extParams.githubAPIToken}`,
-      },
-      body: JSON.stringify({ query }),
-    });
-
-    if (!resp.ok) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        `Failed to fetch from GitHub GraphQL API: ${resp.statusText}`,
-      );
-      return [];
-    }
-
-    const result = await resp.json() as
-      | { data: Record<string, { pushedAt: string }> }
-      | { errors: { message: string }[] };
-
-    if ("errors" in result) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        `Failed to fetch from GitHub GraphQL API: ${result.errors[0].message}`,
-      );
-      return [];
-    }
-
-    return plugins
-      .map((plugin, index) => {
-        const pushedAt = result?.data?.[`repo${index}`]?.pushedAt;
-        const updated = pushedAt ? new Date(pushedAt) : undefined;
-        if (updated && updated > baseUpdated) {
-          return { plugin, updated } as CheckUpdatedPlugin;
-        }
-        return undefined;
-      }).filter((p): p is CheckUpdatedPlugin => p !== undefined);
-  }
-
   async #getLogMessage(
     denops: Denops,
     extParams: Params,
@@ -1157,7 +1048,9 @@ export class Ext extends BaseExt<Params> {
         extParams,
         plugin,
         command,
-        (msg) => { changesCount = parseInt(msg, 10); },
+        (msg) => {
+          changesCount = parseInt(msg, 10);
+        },
       );
     }
 
@@ -1285,7 +1178,9 @@ export class Ext extends BaseExt<Params> {
         extParams,
         plugin,
         command,
-        (msg) => { if (msg) output.push(msg); },
+        (msg) => {
+          if (msg) output.push(msg);
+        },
       );
       await outputCheckDiff(denops, output);
     }
@@ -1562,31 +1457,6 @@ function pipeStream(
         },
       }),
     );
-}
-
-function extractGitHubRepo(repo: string): [string, string] | undefined {
-  if (repo.startsWith("https://github.com/")) {
-    // https://github.com/ style
-    const [owner, name] = repo.slice(19).split("/");
-    return [owner, name.replace(/\.git$/, "")];
-  } else if (repo.startsWith("github.com/")) {
-    // github.com/ style
-    const [owner, name] = repo.slice(11).split("/");
-    return [owner, name.replace(/\.git$/, "")];
-  } else if (repo.startsWith("git@github.com:")) {
-    // git@github.com: style
-    const [owner, name] = repo.slice(15).split("/");
-    return [owner, name.replace(/\.git$/, "")];
-  }
-
-  const splitted = repo.split("/");
-  if (splitted.length === 2) {
-    // owner/name style
-    const [owner, name] = splitted;
-    return [owner, name.replace(/\.git$/, "")];
-  }
-
-  return undefined;
 }
 
 function timeAgo(d: Date, now = new Date()): string {
