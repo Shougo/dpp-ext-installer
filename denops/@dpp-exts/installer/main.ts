@@ -1048,7 +1048,9 @@ export class Ext extends BaseExt<Params> {
         extParams,
         plugin,
         command,
-        (msg) => { changesCount = parseInt(msg, 10); },
+        (msg) => {
+          changesCount = parseInt(msg, 10);
+        },
       );
     }
 
@@ -1176,7 +1178,9 @@ export class Ext extends BaseExt<Params> {
         extParams,
         plugin,
         command,
-        (msg) => { if (msg) output.push(msg); },
+        (msg) => {
+          if (msg) output.push(msg);
+        },
       );
       await outputCheckDiff(denops, output);
     }
