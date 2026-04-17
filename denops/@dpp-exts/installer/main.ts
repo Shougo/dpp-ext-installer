@@ -1352,27 +1352,35 @@ export class Ext extends BaseExt<Params> {
     if (this.#logFlushTimer === null) {
       this.#logFlushTimer = setTimeout(async () => {
         this.#logFlushTimer = null;
-        // Prevent overlapping flushes if a previous one is still in progress.
-        if (this.#logFlushing) return;
-        this.#logFlushing = true;
-        if (!this.#cachedLogFilePath) {
-          this.#logFlushing = false;
+        // If a flush is already in progress, reschedule so buffered messages
+        // are not silently dropped.
+        if (this.#logFlushing) {
+          this.#logFlushTimer = setTimeout(
+            () => this.#scheduleFlush(),
+            this.#logFlushIntervalMs,
+          ) as unknown as number;
           return;
         }
-        const content = this.#logBuffer.join("");
-        this.#logBuffer = [];
-        try {
-          await Deno.writeTextFile(this.#cachedLogFilePath, content, {
-            append: true,
-          });
-        } catch (e) {
-          console.error(
-            `[dpp-ext-installer] Failed to flush log buffer: ${e}`,
-          );
-        } finally {
-          this.#logFlushing = false;
-        }
+        await this.#scheduleFlush();
       }, this.#logFlushIntervalMs) as unknown as number;
+    }
+  }
+
+  async #scheduleFlush() {
+    if (this.#logFlushing || !this.#cachedLogFilePath) return;
+    this.#logFlushing = true;
+    const content = this.#logBuffer.join("");
+    this.#logBuffer = [];
+    try {
+      await Deno.writeTextFile(this.#cachedLogFilePath, content, {
+        append: true,
+      });
+    } catch (e) {
+      console.error(
+        `[dpp-ext-installer] Failed to flush log buffer: ${e}`,
+      );
+    } finally {
+      this.#logFlushing = false;
     }
   }
 }

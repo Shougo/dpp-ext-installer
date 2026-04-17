@@ -6,12 +6,16 @@ import {
 } from "../denops/@dpp-exts/installer/utils.ts";
 
 Deno.test("getFormattedDate returns YYMMDDhhmmss format", () => {
-  const d = new Date("2023-04-05T12:34:56Z");
+  // Use a fixed date and compute expected output based on local time to avoid
+  // timezone-sensitive failures.
+  const d = new Date(2023, 3, 5, 12, 34, 56); // month is 0-indexed: April = 3
   const s = getFormattedDate(d);
-  // Expect 12 characters (YYMMDDhhmmss)
+  // Expect exactly 12 characters (YYMMDDhhmmss)
   assert.equal(s.length, 12);
-  // Basic sanity: month/day/hh present
-  assert.ok(s.includes("04"));
+  // Year "23", month "04", day "05"
+  assert.equal(s.slice(0, 6), "230405");
+  // Hours "12", minutes "34", seconds "56"
+  assert.equal(s.slice(6), "123456");
 });
 
 Deno.test("timeAgo outputs expected granularity", () => {
