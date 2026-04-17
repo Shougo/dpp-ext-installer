@@ -22,8 +22,8 @@ import * as op from "@denops/std/option";
 import * as fn from "@denops/std/function";
 
 import { delay } from "@std/async/delay";
-import { TextLineStream } from "@std/streams/text-line-stream";
 import { Semaphore } from "@core/asyncutil/semaphore";
+import { getFormattedDate, pipeStream, timeAgo } from "./utils.ts";
 
 export type Params = {
   checkDiff: boolean;
@@ -91,6 +91,11 @@ export class Ext extends BaseExt<Params> {
   #updatedPlugins: Plugin[] = [];
   #cachedLogFilePathParam: string | null = null;
   #cachedLogFilePath: string | null = null;
+  // Log buffering
+  #logBuffer: string[] = [];
+  #logFlushTimer: number | null = null;
+  #logFlushing = false;
+  #logFlushIntervalMs = 500;
 
   override async onInit(args: {
     denops: Denops;
@@ -1225,7 +1230,7 @@ export class Ext extends BaseExt<Params> {
     onStdout: (msg: string) => unknown | Promise<unknown>,
   ): Promise<{ success: boolean; code: number }> {
     const isDir = await isDirectory(plugin.path ?? "");
-    const { stdout, stderr, status } = new Deno.Command(
+    const child = new Deno.Command(
       command.command,
       {
         args: command.args,
@@ -1235,9 +1240,38 @@ export class Ext extends BaseExt<Params> {
       },
     ).spawn();
 
-    await pipeStream(stdout, onStdout);
-    await pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-    return await status;
+    // Start piping stdout/stderr concurrently and wait for both to finish.
+    const stdoutStream = child.stdout!;
+    const stderrStream = child.stderr!;
+
+    const stdoutP = pipeStream(stdoutStream, onStdout).catch(async (e) => {
+      await this.#printError(
+        denops,
+        extParams,
+        `stdout pipe error for ${plugin.name}: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    });
+    const stderrP = pipeStream(
+      stderrStream,
+      this.#printError.bind(this, denops, extParams),
+    ).catch(async (e) => {
+      await this.#printError(
+        denops,
+        extParams,
+        `stderr pipe error for ${plugin.name}: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    });
+
+    const status = await child.status;
+
+    // Wait for stream pipes to finish as well (best-effort).
+    await Promise.all([stdoutP, stderrP]);
+
+    return status;
   }
 
   async #updatedCheck(
@@ -1313,14 +1347,40 @@ export class Ext extends BaseExt<Params> {
       return;
     }
 
+    // Buffer the message and schedule a flush to reduce frequent small writes.
+    this.#logBuffer.push(`${msg}\n`);
+    if (this.#logFlushTimer === null) {
+      this.#logFlushTimer = setTimeout(async () => {
+        this.#logFlushTimer = null;
+        // If a flush is already in progress, reschedule so buffered messages
+        // are not silently dropped.
+        if (this.#logFlushing) {
+          this.#logFlushTimer = setTimeout(
+            () => this.#scheduleFlush(),
+            this.#logFlushIntervalMs,
+          ) as unknown as number;
+          return;
+        }
+        await this.#scheduleFlush();
+      }, this.#logFlushIntervalMs) as unknown as number;
+    }
+  }
+
+  async #scheduleFlush() {
+    if (this.#logFlushing || !this.#cachedLogFilePath) return;
+    this.#logFlushing = true;
+    const content = this.#logBuffer.join("");
+    this.#logBuffer = [];
     try {
-      await Deno.writeTextFile(this.#cachedLogFilePath, `${msg}\n`, {
+      await Deno.writeTextFile(this.#cachedLogFilePath, content, {
         append: true,
       });
     } catch (e) {
-      // Log to stderr to help users diagnose logging problems without
-      // disrupting the main flow
-      console.error(`[dpp-ext-installer] Failed to write log file: ${e}`);
+      console.error(
+        `[dpp-ext-installer] Failed to flush log buffer: ${e}`,
+      );
+    } finally {
+      this.#logFlushing = false;
     }
   }
 }
@@ -1389,12 +1449,22 @@ async function saveRollbackFile(
         const protocolName = plugin.protocol ?? "";
         if (protocolName.length === 0) return;
         const protocol = protocols[protocolName];
-        revisions[plugin.name] = await protocol.protocol.getRevision({
-          denops,
-          plugin,
-          protocolOptions: protocol.options,
-          protocolParams: protocol.params,
-        });
+        try {
+          revisions[plugin.name] = await protocol.protocol.getRevision({
+            denops,
+            plugin,
+            protocolOptions: protocol.options,
+            protocolParams: protocol.params,
+          });
+        } catch (e) {
+          // Log and continue. Leave key absent if failed.
+          await printError(
+            denops,
+            `Failed to get revision for plugin: ${plugin.name}: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          );
+        }
       })
     ),
   );
@@ -1433,65 +1503,6 @@ async function loadRollbackFile(
     );
     return {};
   }
-}
-
-function getFormattedDate(date: Date): string {
-  const year = date.getFullYear().toString().slice(-2);
-  const month = ("0" + (date.getMonth() + 1)).slice(-2);
-  const day = ("0" + date.getDate()).slice(-2);
-  const hours = ("0" + date.getHours()).slice(-2);
-  const minutes = ("0" + date.getMinutes()).slice(-2);
-  const seconds = ("0" + date.getSeconds()).slice(-2);
-
-  return year + month + day + hours + minutes + seconds;
-}
-
-function pipeStream(
-  stream: ReadableStream<Uint8Array>,
-  writer: (msg: string) => unknown | Promise<unknown>,
-): Promise<void> {
-  return stream
-    .pipeThrough(new TextDecoderStream())
-    .pipeThrough(new TextLineStream({ allowCR: true }))
-    .pipeTo(
-      new WritableStream({
-        write: async (chunk) => {
-          await writer(chunk);
-        },
-      }),
-    );
-}
-
-function timeAgo(d: Date, now = new Date()): string {
-  const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
-  if (diffSec < 0) return "just now";
-  if (diffSec < 60) {
-    const s = diffSec;
-    return `${s} second${s === 1 ? "" : "s"} ago`;
-  }
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) {
-    const m = diffMin;
-    return `${m} minute${m === 1 ? "" : "s"} ago`;
-  }
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) {
-    const h = diffHour;
-    return `${h} hour${h === 1 ? "" : "s"} ago`;
-  }
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) {
-    const d = diffDay;
-    return `${d} day${d === 1 ? "" : "s"} ago`;
-  }
-  const diffMonth = Math.floor(diffDay / 30);
-  if (diffMonth < 12) {
-    const mo = diffMonth;
-    return `${mo} month${mo === 1 ? "" : "s"} ago`;
-  }
-  const diffYear = Math.floor(diffDay / 365);
-  const y = diffYear;
-  return `${y} year${y === 1 ? "" : "s"} ago`;
 }
 
 function formatPlugin(updated: UpdatedPlugin): string {
