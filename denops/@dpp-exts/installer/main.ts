@@ -944,6 +944,14 @@ export class Ext extends BaseExt<Params> {
   ) {
     const notInstalled = await this.actions.getNotInstalled.callback(args);
 
+    if (notInstalled.length > 0) {
+      await this.#printNotInstalledPlugins(
+        args.denops,
+        args.extParams,
+        notInstalled,
+      );
+    }
+
     const map = new Map<string, CheckUpdatedPlugin>();
     for (const cp of checked) {
       map.set(cp.plugin.name, cp);
@@ -1220,6 +1228,19 @@ export class Ext extends BaseExt<Params> {
           }`,
       );
     }
+  }
+
+  async #printNotInstalledPlugins(
+    denops: Denops,
+    extParams: Params,
+    plugins: Plugin[],
+  ) {
+    await this.#printMessage(
+      denops,
+      extParams,
+      "Not installed plugins:\n" +
+        `${plugins.map((plugin) => "  " + plugin.name).join("\n")}`,
+    );
   }
 
   async #runCommand(
