@@ -70,13 +70,11 @@ type Rollbacks = Record<string, string>;
 export type ExtActions<Params extends BaseParams> = {
   build: Action<Params, void>;
   checkNotUpdated: Action<Params, void>;
-  checkRemoteUpdated: Action<Params, void>;
   denoCache: Action<Params, void>;
   getFailed: Action<Params, Plugin[]>;
   getLogs: Action<Params, string[]>;
   getNotInstalled: Action<Params, Plugin[]>;
   getNotUpdated: Action<Params, Plugin[]>;
-  getRemoteUpdated: Action<Params, Plugin[]>;
   getUpdateLogs: Action<Params, string[]>;
   getUpdated: Action<Params, Plugin[]>;
   install: Action<Params, void>;
@@ -133,27 +131,6 @@ export class Ext extends BaseExt<Params> {
     },
     checkNotUpdated: {
       description: "Check not updated plugins",
-      callback: async (args: {
-        denops: Denops;
-        context: Context;
-        options: DppOptions;
-        protocols: Record<ProtocolName, Protocol>;
-        extOptions: ExtOptions;
-        extParams: Params;
-        actionParams: BaseParams;
-      }) => {
-        const params = args.actionParams as CheckParams;
-
-        const checked = await this.#checkRemotePlugins(
-          args,
-          await getPlugins(args.denops, params.names ?? []),
-        );
-
-        await this.#promptAndUpdate(args, checked, params);
-      },
-    },
-    checkRemoteUpdated: {
-      description: "Check remote updated plugins",
       callback: async (args: {
         denops: Denops;
         context: Context;
@@ -234,24 +211,6 @@ export class Ext extends BaseExt<Params> {
     },
     getNotUpdated: {
       description: "Get not updated plugins",
-      callback: async (args: {
-        denops: Denops;
-        options: DppOptions;
-        protocols: Record<ProtocolName, Protocol>;
-        extParams: Params;
-        actionParams: BaseParams;
-      }) => {
-        const params = args.actionParams as InstallParams;
-        const plugins = (await this.#checkRemotePlugins(
-          args,
-          await getPlugins(args.denops, params.names ?? []),
-        )).map((updated) => updated.plugin);
-
-        return plugins;
-      },
-    },
-    getRemoteUpdated: {
-      description: "Get remote updated plugins",
       callback: async (args: {
         denops: Denops;
         options: DppOptions;

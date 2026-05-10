@@ -58,18 +58,7 @@ build
                                     *dpp-ext-installer-action-checkNotUpdated*
 checkNotUpdated
 		Check not updated or not installed plugins via the protocol
-		(same as |dpp-ext-installer-action-checkRemoteUpdated|).
-		It does not return value but prompts whether update.
-
-		params:
-			{names}:	Plugin names.
-					(Default: [])
-			{force}:	Force update plugins if possible.
-					(Default: false)
-
-                                 *dpp-ext-installer-action-checkRemoteUpdated*
-checkRemoteUpdated
-		Check updated plugins from remote repository.
+		(same as |dpp-ext-installer-action-checkUpdated|).
 		It does not return value but prompts whether update.
 
 		params:
@@ -111,16 +100,7 @@ getNotInstalled
                                       *dpp-ext-installer-action-getNotUpdated*
 getNotUpdated
 		Get not updated plugins via the protocol
-		(same as |dpp-ext-installer-action-getRemoteUpdated|).
-		NOTE: It must be executed by |dpp#sync_ext_action()|.
-
-		params:
-			{names}:	Plugin names.
-					(Default: [])
-
-                                   *dpp-ext-installer-action-getRemoteUpdated*
-getRemoteUpdated
-		Get remote updated plugins from remote repository.
+		(same as |dpp-ext-installer-action-getUpdated|).
 		NOTE: It must be executed by |dpp#sync_ext_action()|.
 
 		params:
@@ -260,7 +240,7 @@ EXAMPLES                                          *dpp-ext-installer-examples*
 	call dpp#async_ext_action('installer', 'checkNotUpdated')
 
 	" Check not updated plugins (protocol-based)
-	call dpp#async_ext_action('installer', 'checkRemoteUpdated')
+	call dpp#async_ext_action('installer', 'checkUpdated')
 
 	" Get not installed plugins
 	echo dpp#sync_ext_action('installer', 'getNotInstalled')
@@ -349,6 +329,9 @@ A: >vim
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
+
+2026.05.10
+* Remove "checkRemoteUpdated" and "getRemoteUpdated".
 
 2026.04.14
 * "checkNotUpdated" and "getNotUpdated" now use the protocol-based check
