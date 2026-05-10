@@ -246,7 +246,7 @@ ROLLBACK                                          *dpp-ext-installer-rollback*
 
 Before every |dpp-ext-installer-action-install|,
 |dpp-ext-installer-action-reinstall|, or |dpp-ext-installer-action-update|
-operation, `dpp-ext-installer` automatically saves the current revision of
+actions, `dpp-ext-installer` automatically saves the current revision of
 every managed plugin to a snapshot file:
 
 	{base-path}/{name}/rollbacks/{YYMMDDhhmmss}/rollback.json
@@ -323,10 +323,13 @@ FAQ 4:                                               |dpp-ext-installer-faq-4|
 	I want to get not updated plugins by Ddu.
 
 FAQ 5:                                               |dpp-ext-installer-faq-5|
-	I want to use lockfile system.
+	I want to update failed plugins.
 
 FAQ 6:                                               |dpp-ext-installer-faq-6|
-	I want to update failed plugins.
+	Why doesn't "dpp-ext-installer" support lockfiles?
+
+FAQ 7:                                               |dpp-ext-installer-faq-7|
+	What is the difference between rollback and lockfiles?
 
 ------------------------------------------------------------------------------
                                                      *dpp-ext-installer-faq-1*
@@ -372,30 +375,8 @@ A: >vim
 	    \     },
 	    \   ],
 	    \ })
-
+<
                                                      *dpp-ext-installer-faq-5*
-Q: I want to use lockfile system.
-
-A: `dpp-ext-installer` does not currently support lockfiles (a pinned,
-shareable record of every plugin's exact commit intended to reproduce the same
-state across multiple machines).
-
-The rollback feature covers the primary local-recovery use-case: before every
-install/reinstall/update operation the current plugin revisions are saved
-automatically, and you can restore a previous state with the "rollback" param.
-See |dpp-ext-installer-rollback| for details.
-
-The difference between rollback and lockfiles:
-- Rollback: saves a snapshot before each operation so you can quickly revert a
-  bad update in your local environment.
-- Lockfile: a checked-in file that lets you reproduce the exact same plugin
-  versions on a different machine or after a fresh install.
-
-Cross-machine reproducibility via lockfiles may be considered in the future
-but is not currently prioritized.  As a workaround you can copy the generated
-"rollback.json" files to other machines and restore with the "rollback" param.
-
-                                                     *dpp-ext-installer-faq-6*
 Q: I want to update failed plugins.
 
 A: >vim
@@ -403,6 +384,31 @@ A: >vim
 	    \ #{ names: dpp#sync_ext_action('installer', 'getFailed')
 	    \ ->map({ _, val -> val.name }) })
 <
+
+                                                     *dpp-ext-installer-faq-6*
+Q: Why doesn't "dpp-ext-installer" support lockfiles?
+
+A: "dpp-ext-installer" mainly focuses on local plugin updates and recovery.
+It prioritizes rollback support so users can restore previously installed
+plugin revisions after an update causes problems.
+
+Unlike plugin managers that are designed around Git repositories only,
+|dpp.vim| uses extensible protocols and can support non-Git plugin sources.
+Because plugin sources are not limited to a single backend, a generic
+lockfile format is less straightforward.
+
+For this reason, lockfiles are not currently supported.
+They may be reconsidered in the future if there is clear demand.
+
+                                                     *dpp-ext-installer-faq-7*
+Q: What is the difference between rollback and lockfiles?
+
+A: Rollback restores previously installed plugin revisions after an update.
+Lockfiles are mainly used to reproduce the same plugin state across multiple
+environments.
+
+"dpp-ext-installer" currently prioritizes rollback for local recovery after
+plugin updates.
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*

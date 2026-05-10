@@ -65,23 +65,6 @@ string instead of `'latest'`.
 Rollback is intended for quickly recovering from a plugin update that caused
 problems in your local environment.
 
-## FAQ
-
-### Why are lockfiles not supported?
-
-`dpp-ext-installer` currently does not support lockfiles (a pinned,
-shareable record of every plugin's exact commit used to reproduce the same
-state across multiple machines).
-
-The rollback feature covers the primary local-recovery use-case: if an update
-breaks something you can immediately revert.  Lockfile support (cross-machine
-reproducibility) may be considered in the future, but it is not currently
-prioritized.
-
-If cross-machine reproducibility is important to you, you can manually copy
-the generated `rollback.json` files to other machines and restore with the
-`rollback` param.
-
 ## Screenshots
 
 ![install UI](install_ui.png)
