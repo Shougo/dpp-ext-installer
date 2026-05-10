@@ -12,6 +12,7 @@ Interface		|dpp-ext-installer-interface|
   Attrs			  |dpp-ext-installer-attrs|
   Params		  |dpp-ext-installer-params|
   Autocmds		  |dpp-ext-installer-autocmds|
+Rollback		|dpp-ext-installer-rollback|
 Examples		|dpp-ext-installer-examples|
 FAQ			|dpp-ext-installer-faq|
 Compatibility		|dpp-ext-installer-compatibility|
@@ -121,45 +122,66 @@ getUpdateLogs
 install
 		Install plugins.
 
-		NOTE: The rollback file("rollback.json") is saved under
-		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}" directory.
+		NOTE: Before installing, the current plugin revisions are
+		saved to a rollback snapshot under
+		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}/rollback.json".
+		The special directory "latest" is also updated to always
+		point to the most recent snapshot.
 
 		params:
 			{names}:	Plugin names.
 					(Default: [])
-			{rollback}:	Rollback date.
-					It must be "YYMMDDhhmmss" format or
-					"latest".
+			{rollback}:	Restore plugins to a previously saved
+					revision snapshot instead of installing
+					fresh.  Use "YYMMDDhhmmss" to target a
+					specific snapshot, or "latest" to
+					restore the state from the most recent
+					snapshot.
 					(Default: "")
 
                                           *dpp-ext-installer-action-reinstall*
 reinstall
 		Reinstall plugins.
 
-		NOTE: The rollback file("rollback.json") is saved under
-		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}" directory.
+		NOTE: Before reinstalling, the current plugin revisions are
+		saved to a rollback snapshot under
+		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}/rollback.json".
+		The special directory "latest" is also updated to always
+		point to the most recent snapshot.
 
 		params:
 			{names}:	Plugin names.
 					(Required)
-			{rollback}:	Rollback date.
-					It must be "YYMMDDhhmmss" format or
-					"latest".
+			{rollback}:	Restore plugins to a previously saved
+					revision snapshot instead of
+					reinstalling fresh.  Use "YYMMDDhhmmss"
+					to target a specific snapshot, or
+					"latest" to restore the state from the
+					most recent snapshot.
 					(Default: "")
 
                                              *dpp-ext-installer-action-update*
 update
 		Update plugins.
 
-		NOTE: The rollback file("rollback.json") is saved under
-		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}" directory.
+		NOTE: Before updating, the current plugin revisions are
+		saved to a rollback snapshot under
+		"{base-path}/{name}/rollbacks/{YYMMDDhhmmss}/rollback.json".
+		The special directory "latest" is also updated to always
+		point to the most recent snapshot.
 
 		params:
 			{names}:	Plugin names.
 					(Default: [])
-			{rollback}:	Rollback date.
-					It must be "YYMMDDhhmmss" format or
-					"latest".
+			{rollback}:	Restore plugins to a previously saved
+					revision snapshot instead of updating
+					to the latest upstream revision.  Use
+					"YYMMDDhhmmss" to target a specific
+					snapshot, or "latest" to restore the
+					state from the most recent snapshot.
+					This is the recommended way to recover
+					from a plugin update that caused
+					problems.
 					(Default: "")
 
 ------------------------------------------------------------------------------
@@ -220,6 +242,45 @@ Dpp:ext:installer:updateDone
 		NOTE: It is called if updated plugins are empty.
 
 ==============================================================================
+ROLLBACK                                          *dpp-ext-installer-rollback*
+
+Before every |dpp-ext-installer-action-install|,
+|dpp-ext-installer-action-reinstall|, or |dpp-ext-installer-action-update|
+actions, `dpp-ext-installer` automatically saves the current revision of
+every managed plugin to a snapshot file:
+
+	{base-path}/{name}/rollbacks/{YYMMDDhhmmss}/rollback.json
+
+Two snapshots are written each time:
+
+- A timestamped directory (e.g. "260510153045") that permanently records the
+  state at that exact moment.
+- The special directory "latest", which is overwritten on every operation and
+  always contains the most recent pre-operation snapshot.
+
+Rollback is designed for local recovery: if a plugin update introduces a
+regression you can immediately restore the previous state without having to
+remember which revision was installed before.
+
+To restore all plugins to the state before the last update:
+>vim
+	call dpp#async_ext_action('installer', 'update',
+	\ #{ rollback: 'latest' })
+<
+
+To restore to a specific earlier snapshot:
+>vim
+	call dpp#async_ext_action('installer', 'update',
+	\ #{ rollback: '260510120000' })
+<
+
+To restore only specific plugins to the previous state:
+>vim
+	call dpp#async_ext_action('installer', 'update',
+	\ #{ names: ['dpp.vim'], rollback: 'latest' })
+<
+
+==============================================================================
 EXAMPLES                                          *dpp-ext-installer-examples*
 >vim
 	" Install plugins
@@ -262,10 +323,13 @@ FAQ 4:                                               |dpp-ext-installer-faq-4|
 	I want to get not updated plugins by Ddu.
 
 FAQ 5:                                               |dpp-ext-installer-faq-5|
-	I want to use lockfile system.
+	I want to update failed plugins.
 
 FAQ 6:                                               |dpp-ext-installer-faq-6|
-	I want to update failed plugins.
+	Why doesn't "dpp-ext-installer" support lockfiles?
+
+FAQ 7:                                               |dpp-ext-installer-faq-7|
+	What is the difference between rollback and lockfiles?
 
 ------------------------------------------------------------------------------
                                                      *dpp-ext-installer-faq-1*
@@ -311,14 +375,8 @@ A: >vim
 	    \     },
 	    \   ],
 	    \ })
-
+<
                                                      *dpp-ext-installer-faq-5*
-Q: I want to use lockfile system.
-
-A: You can use "rollback" param when |dpp-ext-installer-action-install| or
-|dpp-ext-installer-action-update|.
-
-                                                     *dpp-ext-installer-faq-6*
 Q: I want to update failed plugins.
 
 A: >vim
@@ -326,6 +384,31 @@ A: >vim
 	    \ #{ names: dpp#sync_ext_action('installer', 'getFailed')
 	    \ ->map({ _, val -> val.name }) })
 <
+
+                                                     *dpp-ext-installer-faq-6*
+Q: Why doesn't "dpp-ext-installer" support lockfiles?
+
+A: "dpp-ext-installer" mainly focuses on local plugin updates and recovery.
+It prioritizes rollback support so users can restore previously installed
+plugin revisions after an update causes problems.
+
+Unlike plugin managers that are designed around Git repositories only,
+|dpp.vim| uses extensible protocols and can support non-Git plugin sources.
+Because plugin sources are not limited to a single backend, a generic
+lockfile format is less straightforward.
+
+For this reason, lockfiles are not currently supported.
+They may be reconsidered in the future if there is clear demand.
+
+                                                     *dpp-ext-installer-faq-7*
+Q: What is the difference between rollback and lockfiles?
+
+A: Rollback restores previously installed plugin revisions after an update.
+Lockfiles are mainly used to reproduce the same plugin state across multiple
+environments.
+
+"dpp-ext-installer" currently prioritizes rollback for local recovery after
+plugin updates.
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
