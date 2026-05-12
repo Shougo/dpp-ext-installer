@@ -32,9 +32,6 @@ https://github.com/Shougo/dpp.vim
 	" Check not updated plugins
 	call dpp#async_ext_action('installer', 'checkNotUpdated')
 
-	" Check not updated plugins (protocol-based)
-	call dpp#async_ext_action('installer', 'checkUpdated')
-
 	" Get not installed plugins
 	echo dpp#sync_ext_action('installer', 'getNotInstalled')
 ```

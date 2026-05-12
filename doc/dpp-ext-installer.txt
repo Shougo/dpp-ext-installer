@@ -58,8 +58,7 @@ build
 
                                     *dpp-ext-installer-action-checkNotUpdated*
 checkNotUpdated
-		Check not updated or not installed plugins via the protocol
-		(same as |dpp-ext-installer-action-checkUpdated|).
+		Check not updated or not installed plugins via the protocol.
 		It does not return value but prompts whether update.
 
 		params:
@@ -299,9 +298,6 @@ EXAMPLES                                          *dpp-ext-installer-examples*
 
 	" Check not updated plugins
 	call dpp#async_ext_action('installer', 'checkNotUpdated')
-
-	" Check not updated plugins (protocol-based)
-	call dpp#async_ext_action('installer', 'checkUpdated')
 
 	" Get not installed plugins
 	echo dpp#sync_ext_action('installer', 'getNotInstalled')
