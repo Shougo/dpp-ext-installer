@@ -1497,10 +1497,22 @@ function formatPlugin(updated: UpdatedPlugin): string {
     : `(${updated.changesCount} change${
       updated.changesCount === 1 ? "" : "s"
     })`;
+  const pad = (n: number) => n.toString().padStart(2, "0");
   const formatDate = (d: Date) =>
-    d.toISOString().replace("T", " ").slice(0, 19);
-  const date = updated.oldRevDate
-    ? `\n    ${formatDate(updated.oldRevDate)} (${timeAgo(updated.oldRevDate)})`
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${
+      pad(d.getHours())
+    }:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const oldDate = updated.oldRevDate
+    ? `${formatDate(updated.oldRevDate)}`
+    : "-";
+  const newDate = updated.newRevDate
+    ? `${formatDate(updated.newRevDate)}`
+    : "-";
+  const ago = updated.newRevDate
+    ? ` (${timeAgo(updated.newRevDate)})`
+    : "";
+  const date = updated.oldRevDate || updated.newRevDate
+    ? `\n    ${oldDate} -> ${newDate}${ago}`
     : "";
   return `  ${updated.plugin.name}${changes}${compareLink}${date}`;
 }
