@@ -1563,7 +1563,7 @@ async function checkCommitDays(
   const minDays = (plugin.extAttrs as Attrs)?.installerMinCommitDays ??
     extParams.minCommitDays;
   const current = new Date()
-  const diff = dateDiffDays(newRevDate, current);
+  const diff = dateDiffDays(current, newRevDate);
   if (diff !== null && diff < minDays) {
     const pad = (n: number) => n.toString().padStart(2, "0");
     const formatDate = (d: Date) =>
