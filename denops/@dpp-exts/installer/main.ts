@@ -23,18 +23,25 @@ import * as fn from "@denops/std/function";
 
 import { delay } from "@std/async/delay";
 import { Semaphore } from "@core/asyncutil/semaphore";
-import { getFormattedDate, pipeStream, timeAgo } from "./utils.ts";
+import {
+  dateDiffDays,
+  getFormattedDate,
+  pipeStream,
+  timeAgo,
+} from "./utils.ts";
 
 export type Params = {
   checkDiff: boolean;
   logFilePath: string;
   maxProcesses: number;
+  minCommitDays: number;
   wait: number;
 };
 
 export type Attrs = {
   installerBuild?: string;
   installerFrozen?: boolean;
+  installerMinCommitDays?: number;
 };
 
 export type InstallParams = {
@@ -356,6 +363,7 @@ export class Ext extends BaseExt<Params> {
       checkDiff: false,
       logFilePath: "",
       maxProcesses: 5,
+      minCommitDays: 0,
       wait: 0,
     };
   }
@@ -685,6 +693,15 @@ export class Ext extends BaseExt<Params> {
           }),
         ]);
 
+        // Print warnings if the commit days are invalid.
+        await checkCommitDays(
+          args.denops,
+          args.extParams,
+          plugin,
+          oldRevDate,
+          newRevDate,
+        );
+
         updatedPlugins.push({
           plugin,
           protocol,
@@ -873,6 +890,19 @@ export class Ext extends BaseExt<Params> {
           rev: newRev,
         }),
       ]);
+
+      if (
+        await checkCommitDays(
+          args.denops,
+          args.extParams,
+          plugin,
+          oldRevDate,
+          newRevDate,
+        )
+      ) {
+        // Skip
+        return;
+      }
 
       updatedPlugins.push({
         plugin,
@@ -1508,11 +1538,45 @@ function formatPlugin(updated: UpdatedPlugin): string {
   const newDate = updated.newRevDate
     ? `${formatDate(updated.newRevDate)}`
     : "-";
-  const ago = updated.newRevDate
-    ? ` (${timeAgo(updated.newRevDate)})`
-    : "";
+  const ago = updated.newRevDate ? ` (${timeAgo(updated.newRevDate)})` : "";
   const date = updated.oldRevDate || updated.newRevDate
     ? `\n    ${oldDate} -> ${newDate}${ago}`
     : "";
   return `  ${updated.plugin.name}${changes}${compareLink}${date}`;
+}
+
+async function checkCommitDays(
+  denops: Denops,
+  extParams: Params,
+  plugin: Plugin,
+  oldRevDate: Date | null,
+  newRevDate: Date | null,
+): Promise<boolean> {
+  if (!oldRevDate || !newRevDate) {
+    return false;
+  }
+
+  const minDays = (plugin.extAttrs as Attrs)?.installerMinCommitDays ??
+    extParams.minCommitDays;
+  const current = new Date()
+  const diff = dateDiffDays(newRevDate, current);
+  if (diff !== null && diff < minDays) {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const formatDate = (d: Date) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${
+        pad(d.getHours())
+      }:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+    await printError(
+      denops,
+      `${plugin.name} update is invalid.\n` +
+        `  Current day:  ${formatDate(current)}\n` +
+        `  Previous commit: ${formatDate(oldRevDate!)}\n` +
+        `  Current commit:  ${formatDate(newRevDate!)}\n` +
+        `  Days since last commit: ${diff} (minimum required: ${minDays})`,
+    );
+    return true;
+  }
+
+  return false;
 }

@@ -9,6 +9,14 @@ export function getFormattedDate(date: Date): string {
   return year + month + day + hours + minutes + seconds;
 }
 
+export function dateDiffDays(a: Date | null, b: Date | null): number | null {
+  if (!a || !b) return null;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.floor((utcA - utcB) / msPerDay);
+}
+
 export function timeAgo(d: Date, now = new Date()): string {
   const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
   if (diffSec < 0) return "just now";

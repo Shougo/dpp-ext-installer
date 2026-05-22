@@ -196,6 +196,13 @@ installerBuild  (String)
 		type dictionary, but that is now deprecated.
 		Please use |dpp-plugin-option-hook_post_update| instead.
 
+                               *dpp-ext-installer-attr-installerMinCommitDays*
+installerMinCommitDays (Number)
+		Specify the minimum number of days that must have passed since
+		the previous commit in order to update a plugin.
+		If you don't specify the value,
+		|dpp-ext-installer-param-minCommitDays| is used.
+
                                       *dpp-ext-installer-attr-installerFrozen*
 installerFrozen (Bool)
 		If set to v:true, dpp doesn't update it automatically. It is
@@ -222,6 +229,29 @@ maxProcesses
 		The max number of processes used for update.
 
 		Defaults: 5
+
+                                       *dpp-ext-installer-param-minCommitDays*
+minCommitDays
+		Specify the minimum number of days that must have passed since
+		the previous commit in order to update a plugin.
+
+		If it is greater than 0, |dpp-ext-installer| will check the
+		days between the previous and current commit when performing
+		plugin updates.
+
+		On |dpp-ext-installer-action-install| or
+		|dpp-ext-installer-action-update|:
+			If the interval is less than it, only a warning is
+			shown, but the plugin is updated anyway.
+
+		On |dpp-ext-installer-action-checkNotUpdated|:
+			If the interval is less than it, a warning is
+			displayed and the update will be **skipped**.
+
+		It helps you avoid updating plugins too frequently (e.g.
+		following experimental or fast-moving branches).
+
+		Defaults: 0
 
                                                 *dpp-ext-installer-param-wait*
 wait
