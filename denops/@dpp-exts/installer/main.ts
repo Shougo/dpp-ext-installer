@@ -693,26 +693,30 @@ export class Ext extends BaseExt<Params> {
           }),
         ]);
 
-        // Print warnings if the commit days are invalid.
-        await checkCommitDays(
-          args.denops,
-          args.extParams,
-          plugin,
-          oldRevDate,
-          newRevDate,
-        );
-
-        updatedPlugins.push({
-          plugin,
-          protocol,
-          oldRev,
-          newRev,
-          oldRevDate,
-          newRevDate,
-          url,
-          logMessage,
-          changesCount,
-        });
+        // NOTE: Print warnings if the commit days are invalid.
+        if (
+          await checkCommitDays(
+            args.denops,
+            args.extParams,
+            plugin,
+            oldRevDate,
+            newRevDate,
+          )
+        ) {
+          failedPlugins.push(plugin);
+        } else {
+          updatedPlugins.push({
+            plugin,
+            protocol,
+            oldRev,
+            newRev,
+            oldRevDate,
+            newRevDate,
+            url,
+            logMessage,
+            changesCount,
+          });
+        }
       }
     } else {
       failedPlugins.push(plugin);

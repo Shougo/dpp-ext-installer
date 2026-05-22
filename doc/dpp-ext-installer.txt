@@ -357,6 +357,9 @@ FAQ 6:                                               |dpp-ext-installer-faq-6|
 FAQ 7:                                               |dpp-ext-installer-faq-7|
 	What is the difference between rollback and lockfiles?
 
+FAQ 8:                                               |dpp-ext-installer-faq-8|
+	I want to delay plugin updates as security feature.
+
 ------------------------------------------------------------------------------
                                                      *dpp-ext-installer-faq-1*
 Q: The installation/update is slow.
@@ -435,6 +438,12 @@ environments.
 
 "dpp-ext-installer" currently prioritizes rollback for local recovery after
 plugin updates.
+
+                                                     *dpp-ext-installer-faq-8*
+Q: I want to delay plugin updates as security feature.
+
+A: You can specify |dpp-ext-installer-param-minCommitDays| and you can check
+updates by |dpp-ext-installer-action-checkNotUpdated|.
 
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
