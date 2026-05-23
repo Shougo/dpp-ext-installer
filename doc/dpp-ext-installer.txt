@@ -448,6 +448,9 @@ updates by |dpp-ext-installer-action-checkNotUpdated|.
 ==============================================================================
 COMPATIBILITY                                *dpp-ext-installer-compatibility*
 
+2026.05.23
+* Change rollback files format.  It is not compatible with old versions.
+
 2026.05.10
 * Remove "checkRemoteUpdated" and "getRemoteUpdated".
 

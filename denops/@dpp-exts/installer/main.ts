@@ -72,7 +72,14 @@ type CheckUpdatedPlugin = {
   updated?: Date;
 };
 
-type Rollbacks = Record<string, string>;
+type Rollback = {
+  name: string;
+  newRev: string;
+  oldRev?: string;
+  newRevDate: Date | null;
+  oldRevDate?: Date | null;
+};
+type Rollbacks = Record<string, Rollback>;
 
 export type ExtActions<Params extends BaseParams> = {
   build: Action<Params, void>;
@@ -274,14 +281,14 @@ export class Ext extends BaseExt<Params> {
           ),
         );
 
-        const revisions = params.rollback
+        const rollbacks = params.rollback
           ? await loadRollbackFile(args.denops, params.rollback)
           : {};
 
         await this.#updatePlugins(
           args,
           plugins.filter((_, i) => bits[i]),
-          revisions,
+          rollbacks,
         );
       },
     },
@@ -307,7 +314,7 @@ export class Ext extends BaseExt<Params> {
 
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
-        const revisions = params.rollback
+        const rollbacks = params.rollback
           ? await loadRollbackFile(args.denops, params.rollback)
           : {};
 
@@ -328,7 +335,7 @@ export class Ext extends BaseExt<Params> {
           }
         }));
 
-        await this.#updatePlugins(args, plugins, revisions);
+        await this.#updatePlugins(args, plugins, rollbacks);
       },
     },
     update: {
@@ -343,7 +350,7 @@ export class Ext extends BaseExt<Params> {
         const params = args.actionParams as InstallParams;
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
-        const revisions = params.rollback
+        const rollbacks = params.rollback
           ? await loadRollbackFile(args.denops, params.rollback)
           : {};
 
@@ -352,7 +359,7 @@ export class Ext extends BaseExt<Params> {
           plugins.filter((plugin) =>
             !(plugin.extAttrs as Attrs)?.installerFrozen
           ),
-          revisions,
+          rollbacks,
         );
       },
     },
@@ -377,7 +384,7 @@ export class Ext extends BaseExt<Params> {
       actionParams: BaseParams;
     },
     plugins: Plugin[],
-    revisions: Record<string, string>,
+    rollbacks: Rollbacks,
   ) {
     this.#failedPlugins = [];
     this.#logs = [];
@@ -419,7 +426,7 @@ export class Ext extends BaseExt<Params> {
           args,
           updatedPlugins,
           failedPlugins,
-          revisions,
+          rollbacks,
           plugins.length,
           plugin,
           index + 1,
@@ -477,7 +484,7 @@ export class Ext extends BaseExt<Params> {
         updatedPlugins,
       );
 
-      await saveRollbackFile(args.denops, args.protocols);
+      await saveRollbackFile(args.denops, args.protocols, updatedPlugins);
     }
 
     if (failedPlugins.length > 0) {
@@ -521,7 +528,7 @@ export class Ext extends BaseExt<Params> {
     },
     updatedPlugins: UpdatedPlugin[],
     failedPlugins: Plugin[],
-    revisions: Record<string, string>,
+    rollbacks: Rollbacks,
     maxLength: number,
     plugin: Plugin,
     index: number,
@@ -579,7 +586,7 @@ export class Ext extends BaseExt<Params> {
       protocolParams: protocol.params,
     });
 
-    if (revisions[plugin.name]) {
+    if (rollbacks[plugin.name]) {
       // Add rollback commands
       commands.push(
         ...await protocol.protocol.getRollbackCommands({
@@ -587,7 +594,7 @@ export class Ext extends BaseExt<Params> {
           plugin,
           protocolOptions: protocol.options,
           protocolParams: protocol.params,
-          rev: revisions[plugin.name],
+          rev: rollbacks[plugin.name].newRev,
         }),
       );
     }
@@ -1452,10 +1459,11 @@ async function outputCheckDiff(denops: Denops, output: string[]) {
 async function saveRollbackFile(
   denops: Denops,
   protocols: Record<ProtocolName, Protocol>,
+  updatedPlugins: UpdatedPlugin[],
 ) {
   // Get revisions with limited concurrency to avoid excessive IO/processes
   const plugins = await getPlugins(denops, []);
-  const revisions: Rollbacks = {};
+  const rollbacks: Rollbacks = {};
   const sem = new Semaphore(5);
   await Promise.all(
     plugins.map((plugin) =>
@@ -1463,25 +1471,38 @@ async function saveRollbackFile(
         const protocolName = plugin.protocol ?? "";
         if (protocolName.length === 0) return;
         const protocol = protocols[protocolName];
-        try {
-          revisions[plugin.name] = await protocol.protocol.getRevision({
-            denops,
-            plugin,
-            protocolOptions: protocol.options,
-            protocolParams: protocol.params,
-          });
-        } catch (e) {
-          // Log and continue. Leave key absent if failed.
-          await printError(
-            denops,
-            `Failed to get revision for plugin: ${plugin.name}: ${
-              e instanceof Error ? e.message : String(e)
-            }`,
-          );
-        }
+        const newRev = await protocol.protocol.getRevision({
+          denops: denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+        });
+        const newRevDate = await protocol.protocol.getDateFromRevision({
+          denops: denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+          rev: newRev,
+        });
+        rollbacks[plugin.name] = {
+          name: plugin.name,
+          newRev,
+          newRevDate,
+        };
       })
     ),
   );
+
+  // Overwrite rollbacks by updated plugins information
+  for (const updated of updatedPlugins) {
+    rollbacks[updated.plugin.name] = {
+      name: updated.plugin.name,
+      newRev: updated.newRev,
+      oldRev: updated.oldRev,
+      newRevDate: updated.newRevDate,
+      oldRevDate: updated.oldRevDate,
+    };
+  }
 
   // Save rollback file
   const basePath = await denops.call("dpp#util#_get_base_path");
@@ -1490,14 +1511,14 @@ async function saveRollbackFile(
     const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
     await Deno.mkdir(rollbackDir, { recursive: true });
     const rollbackFile = `${rollbackDir}/rollback.json`;
-    await Deno.writeTextFile(rollbackFile, JSON.stringify(revisions));
+    await Deno.writeTextFile(rollbackFile, JSON.stringify(rollbacks));
   }
 }
 
 async function loadRollbackFile(
   denops: Denops,
   date: string,
-): Promise<Record<string, string>> {
+): Promise<Rollbacks> {
   const basePath = await denops.call("dpp#util#_get_base_path");
   const name = await denops.call("dpp#util#_get_name");
   const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
@@ -1562,7 +1583,7 @@ async function checkCommitDays(
 
   const minDays = (plugin.extAttrs as Attrs)?.installerMinCommitDays ??
     extParams.minCommitDays;
-  const current = new Date()
+  const current = new Date();
   const diff = dateDiffDays(current, newRevDate);
   if (diff !== null && diff < minDays) {
     const pad = (n: number) => n.toString().padStart(2, "0");
