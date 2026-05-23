@@ -12,9 +12,7 @@ export function getFormattedDate(date: Date): string {
 export function dateDiffDays(a: Date | null, b: Date | null): number | null {
   if (!a || !b) return null;
   const msPerDay = 24 * 60 * 60 * 1000;
-  const utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
-  const utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
-  return Math.floor((utcA - utcB) / msPerDay);
+  return Math.floor(Math.abs(a.getTime() - b.getTime()) / msPerDay);
 }
 
 export function timeAgo(d: Date, now = new Date()): string {
