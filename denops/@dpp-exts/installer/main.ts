@@ -1533,10 +1533,7 @@ async function loadRollbackFile(
 
   try {
     return JSON.parse(await Deno.readTextFile(rollbackFile), (key, value) => {
-      if (
-        (key === "newRevDate" || key === "oldRevDate") &&
-        typeof value === "string"
-      ) {
+      if (key.endsWith("Date") && typeof value === "string") {
         return new Date(value);
       }
       return value;
