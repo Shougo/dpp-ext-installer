@@ -74,6 +74,7 @@ type CheckUpdatedPlugin = {
 
 type Rollback = {
   name: string;
+  updateDate: Date;
   newRev: string;
   oldRev?: string;
   newRevDate: Date | null;
@@ -1465,6 +1466,7 @@ async function saveRollbackFile(
   const plugins = await getPlugins(denops, []);
   const rollbacks: Rollbacks = {};
   const sem = new Semaphore(5);
+  const updateDate = new Date();
   await Promise.all(
     plugins.map((plugin) =>
       sem.lock(async () => {
@@ -1486,6 +1488,7 @@ async function saveRollbackFile(
         });
         rollbacks[plugin.name] = {
           name: plugin.name,
+          updateDate,
           newRev,
           newRevDate,
         };
@@ -1497,6 +1500,7 @@ async function saveRollbackFile(
   for (const updated of updatedPlugins) {
     rollbacks[updated.plugin.name] = {
       name: updated.plugin.name,
+      updateDate,
       newRev: updated.newRev,
       oldRev: updated.oldRev,
       newRevDate: updated.newRevDate,
