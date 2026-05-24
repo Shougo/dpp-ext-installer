@@ -647,6 +647,11 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
+      if (oldRev === newRev) {
+        // Skip
+        return;
+      }
+
       const logMessage = await this.#getLogMessage(
         args.denops,
         args.extParams,
@@ -885,6 +890,11 @@ export class Ext extends BaseExt<Params> {
           protocolParams: protocol.params,
         }),
       ]);
+
+      if (oldRev === newRev) {
+        // Skip
+        return;
+      }
 
       const [oldRevDate, newRevDate] = await Promise.all([
         protocol.protocol.getDateFromRevision({
