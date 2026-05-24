@@ -1617,19 +1617,6 @@ async function checkCommitDays(
       pad(d.getHours())
     }:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
-  const rollback = latestRollbacks[plugin.name];
-  // Check the last update date.
-  if (rollback && rollback.updateDate > newRevDate) {
-    await printError(
-      denops,
-      `${plugin.name}: older commit is detected!\n` +
-        `  The last update: ${rollback.updateDate}\n` +
-        `  Previous commit: ${formatDate(oldRevDate)}\n` +
-        `  Current commit:  ${formatDate(newRevDate)}\n`,
-      "You should check the commit.",
-    );
-  }
-
   const minDays = (plugin.extAttrs as Attrs)?.installerMinCommitDays ??
     extParams.minCommitDays;
   const current = new Date();
@@ -1644,6 +1631,19 @@ async function checkCommitDays(
         `  Days since last commit: ${diff} (minimum required: ${minDays})`,
     );
     return true;
+  }
+
+  const rollback = latestRollbacks[plugin.name];
+  // Check the last update date.
+  if (rollback && rollback.updateDate > newRevDate) {
+    await printError(
+      denops,
+      `${plugin.name}: older commit is detected!\n` +
+        `  The last update: ${rollback.updateDate}\n` +
+        `  Previous commit: ${formatDate(oldRevDate)}\n` +
+        `  Current commit:  ${formatDate(newRevDate)}\n`,
+      "You should check the commit.",
+    );
   }
 
   return false;
