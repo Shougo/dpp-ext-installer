@@ -661,11 +661,6 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
-      if (oldRev === newRev) {
-        // Skip
-        return;
-      }
-
       const logMessage = await this.#getLogMessage(
         args.denops,
         args.extParams,
@@ -910,7 +905,7 @@ export class Ext extends BaseExt<Params> {
         }),
       ]);
 
-      if (oldRev === newRev) {
+      if (newRev === oldRev) {
         // Skip
         return;
       }
