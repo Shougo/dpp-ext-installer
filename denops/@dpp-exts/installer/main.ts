@@ -418,6 +418,8 @@ export class Ext extends BaseExt<Params> {
       `Start: ${new Date()}`,
     );
 
+    const latestRollbacks = await loadRollbackFile(args.denops, "latest");
+
     const updatedPlugins: UpdatedPlugin[] = [];
     const failedPlugins: Plugin[] = [];
     const sem = new Semaphore(args.extParams.maxProcesses);
@@ -428,6 +430,7 @@ export class Ext extends BaseExt<Params> {
           updatedPlugins,
           failedPlugins,
           rollbacks,
+          latestRollbacks,
           plugins.length,
           plugin,
           index + 1,
@@ -529,6 +532,7 @@ export class Ext extends BaseExt<Params> {
     },
     updatedPlugins: UpdatedPlugin[],
     failedPlugins: Plugin[],
+    latestRollbacks: Rollbacks,
     rollbacks: Rollbacks,
     maxLength: number,
     plugin: Plugin,
@@ -711,6 +715,7 @@ export class Ext extends BaseExt<Params> {
           await checkCommitDays(
             args.denops,
             args.extParams,
+            latestRollbacks,
             plugin,
             oldRevDate,
             newRevDate,
@@ -768,6 +773,8 @@ export class Ext extends BaseExt<Params> {
       `Start: ${new Date()}`,
     );
 
+    const latestRollbacks = await loadRollbackFile(args.denops, "latest");
+
     const updatedPlugins: UpdatedPlugin[] = [];
     const sem = new Semaphore(args.extParams.maxProcesses);
     await Promise.all(plugins.map((plugin, index) =>
@@ -775,6 +782,7 @@ export class Ext extends BaseExt<Params> {
         await this.#checkRemotePlugin(
           args,
           updatedPlugins,
+          latestRollbacks,
           plugins.length,
           plugin,
           index + 1,
@@ -819,6 +827,7 @@ export class Ext extends BaseExt<Params> {
       actionParams: BaseParams;
     },
     updatedPlugins: UpdatedPlugin[],
+    latestRollbacks: Rollbacks,
     maxLength: number,
     plugin: Plugin,
     index: number,
@@ -917,6 +926,7 @@ export class Ext extends BaseExt<Params> {
         await checkCommitDays(
           args.denops,
           args.extParams,
+          latestRollbacks,
           plugin,
           oldRevDate,
           newRevDate,
@@ -1592,6 +1602,7 @@ function formatPlugin(updated: UpdatedPlugin): string {
 async function checkCommitDays(
   denops: Denops,
   extParams: Params,
+  latestRollbacks: Rollbacks,
   plugin: Plugin,
   oldRevDate: Date | null,
   newRevDate: Date | null,
@@ -1600,23 +1611,36 @@ async function checkCommitDays(
     return false;
   }
 
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const formatDate = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${
+      pad(d.getHours())
+    }:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+  const rollback = latestRollbacks[plugin.name];
+  // Check the last update date.
+  if (rollback && rollback.updateDate > newRevDate) {
+    await printError(
+      denops,
+      `${plugin.name}: older commit is detected!\n` +
+        `  The last update: ${rollback.updateDate}\n` +
+        `  Previous commit: ${formatDate(oldRevDate)}\n` +
+        `  Current commit:  ${formatDate(newRevDate)}\n`,
+      "You should check the commit.",
+    );
+  }
+
   const minDays = (plugin.extAttrs as Attrs)?.installerMinCommitDays ??
     extParams.minCommitDays;
   const current = new Date();
   const diff = dateDiffDays(current, newRevDate);
   if (diff !== null && diff < minDays) {
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    const formatDate = (d: Date) =>
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${
-        pad(d.getHours())
-      }:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-
     await printError(
       denops,
-      `${plugin.name} update is invalid.\n` +
-        `  Current day:  ${formatDate(current)}\n` +
-        `  Previous commit: ${formatDate(oldRevDate!)}\n` +
-        `  Current commit:  ${formatDate(newRevDate!)}\n` +
+      `${plugin.name}: update is invalid!\n` +
+        `  Current day:     ${formatDate(current)}\n` +
+        `  Previous commit: ${formatDate(oldRevDate)}\n` +
+        `  Current commit:  ${formatDate(newRevDate)}\n` +
         `  Days since last commit: ${diff} (minimum required: ${minDays})`,
     );
     return true;
