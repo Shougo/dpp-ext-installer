@@ -43,6 +43,9 @@ export function timeAgo(d: Date, now = new Date()): string {
     return `${mo} month${mo === 1 ? "" : "s"} ago`;
   }
   const diffYear = Math.floor(diffDay / 365);
+  if (diffYear < 1) {
+    return `${diffMonth} month${diffMonth === 1 ? "" : "s"} ago`;
+  }
   const y = diffYear;
   return `${y} year${y === 1 ? "" : "s"} ago`;
 }
