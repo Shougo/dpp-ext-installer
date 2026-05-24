@@ -661,6 +661,15 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
+      if (newRev.length !== 0 && newRev === oldRev) {
+        await this.#printMessage(
+          args.denops,
+          args.extParams,
+          `${plugin.name}: revision is unchanged.\n` +
+            `  Current commit:  ${newRev}`
+        );
+      }
+
       const logMessage = await this.#getLogMessage(
         args.denops,
         args.extParams,
@@ -679,7 +688,7 @@ export class Ext extends BaseExt<Params> {
         newRev,
       );
 
-      if (oldRev.length === 0 || oldRev !== newRev) {
+      if (oldRev.length === 0 || newRev !== oldRev) {
         // Execute "post_update" before "build"
         if (plugin.hook_post_update) {
           await args.denops.call(
