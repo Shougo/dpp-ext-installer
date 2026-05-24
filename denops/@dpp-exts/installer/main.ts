@@ -156,10 +156,14 @@ export class Ext extends BaseExt<Params> {
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as CheckParams;
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+        const checkPlugins = plugins.filter((plugin) =>
+          !(plugin.extAttrs as Attrs)?.installerFrozen
+        );
 
         const checked = await this.#checkRemotePlugins(
           args,
-          await getPlugins(args.denops, params.names ?? []),
+          checkPlugins,
         );
 
         await this.#promptAndUpdate(args, checked, params);
@@ -234,12 +238,16 @@ export class Ext extends BaseExt<Params> {
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
-        const plugins = (await this.#checkRemotePlugins(
+        const plugins = await getPlugins(args.denops, params.names ?? []);
+        const checkPlugins = plugins.filter((plugin) =>
+          !(plugin.extAttrs as Attrs)?.installerFrozen
+        );
+        const notUpdatedPlugins = (await this.#checkRemotePlugins(
           args,
-          await getPlugins(args.denops, params.names ?? []),
+          checkPlugins,
         )).map((updated) => updated.plugin);
 
-        return plugins;
+        return notUpdatedPlugins;
       },
     },
     getUpdateLogs: {
@@ -355,11 +363,13 @@ export class Ext extends BaseExt<Params> {
           ? await loadRollbackFile(args.denops, params.rollback)
           : {};
 
+        const updatePlugins = plugins.filter((plugin) =>
+          !(plugin.extAttrs as Attrs)?.installerFrozen
+        );
+
         await this.#updatePlugins(
           args,
-          plugins.filter((plugin) =>
-            !(plugin.extAttrs as Attrs)?.installerFrozen
-          ),
+          updatePlugins,
           rollbacks,
         );
       },
