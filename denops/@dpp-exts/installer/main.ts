@@ -74,7 +74,7 @@ type CheckUpdatedPlugin = {
 
 type Rollback = {
   name: string;
-  updateDate: Date;
+  updateDate?: Date;
   newRev: string;
   oldRev?: string;
   newRevDate: Date | null;
@@ -1500,7 +1500,6 @@ async function saveRollbackFile(
   const plugins = await getPlugins(denops, []);
   const rollbacks: Rollbacks = {};
   const sem = new Semaphore(5);
-  const updateDate = new Date();
   await Promise.all(
     plugins.map((plugin) =>
       sem.lock(async () => {
@@ -1522,7 +1521,6 @@ async function saveRollbackFile(
         });
         rollbacks[plugin.name] = {
           name: plugin.name,
-          updateDate,
           newRev,
           newRevDate,
         };
@@ -1531,6 +1529,7 @@ async function saveRollbackFile(
   );
 
   // Overwrite rollbacks by updated plugins information
+  const updateDate = new Date();
   for (const updated of updatedPlugins) {
     rollbacks[updated.plugin.name] = {
       name: updated.plugin.name,
@@ -1649,7 +1648,7 @@ async function checkCommitDays(
 
   const rollback = latestRollbacks[plugin.name];
   // Check the last update date.
-  if (rollback && rollback.updateDate > newRevDate) {
+  if (rollback?.updateDate && rollback.updateDate > newRevDate) {
     await printError(
       denops,
       `${plugin.name}: older commit is detected!\n` +
