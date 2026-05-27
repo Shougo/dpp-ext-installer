@@ -82,6 +82,17 @@ type Rollback = {
 };
 type Rollbacks = Record<string, Rollback>;
 
+type CheckHistory = {
+  name: string;
+  checkDate: Date;
+  newRev: string;
+  oldRev?: string;
+  newRevDate: Date | null;
+  oldRevDate?: Date | null;
+  histories: string[];
+};
+type CheckHistories = Record<string, CheckHistory>;
+
 export type ExtActions<Params extends BaseParams> = {
   build: Action<Params, void>;
   checkNotUpdated: Action<Params, void>;
@@ -291,7 +302,7 @@ export class Ext extends BaseExt<Params> {
         );
 
         const rollbacks = params.rollback
-          ? await loadRollbackFile(args.denops, params.rollback)
+          ? await loadRollbacks(args.denops, params.rollback)
           : {};
 
         await this.#updatePlugins(
@@ -324,7 +335,7 @@ export class Ext extends BaseExt<Params> {
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
         const rollbacks = params.rollback
-          ? await loadRollbackFile(args.denops, params.rollback)
+          ? await loadRollbacks(args.denops, params.rollback)
           : {};
 
         await Promise.all(plugins.map(async (plugin) => {
@@ -360,7 +371,7 @@ export class Ext extends BaseExt<Params> {
         const plugins = await getPlugins(args.denops, params.names ?? []);
 
         const rollbacks = params.rollback
-          ? await loadRollbackFile(args.denops, params.rollback)
+          ? await loadRollbacks(args.denops, params.rollback)
           : {};
 
         const updatePlugins = plugins.filter((plugin) =>
@@ -428,7 +439,8 @@ export class Ext extends BaseExt<Params> {
       `Start: ${new Date()}`,
     );
 
-    const latestRollbacks = await loadRollbackFile(args.denops, "latest");
+    const latestRollbacks = await loadRollbacks(args.denops, "latest");
+    const checkHistories = await loadCheckHistories(args.denops);
 
     const updatedPlugins: UpdatedPlugin[] = [];
     const failedPlugins: Plugin[] = [];
@@ -441,6 +453,7 @@ export class Ext extends BaseExt<Params> {
           failedPlugins,
           latestRollbacks,
           rollbacks,
+          checkHistories,
           plugins.length,
           plugin,
           index + 1,
@@ -544,6 +557,7 @@ export class Ext extends BaseExt<Params> {
     failedPlugins: Plugin[],
     latestRollbacks: Rollbacks,
     rollbacks: Rollbacks,
+    checkHistories: CheckHistories,
     maxLength: number,
     plugin: Plugin,
     index: number,
@@ -666,7 +680,7 @@ export class Ext extends BaseExt<Params> {
           args.denops,
           args.extParams,
           `${plugin.name}: revision is unchanged.\n` +
-            `  Current commit:  ${newRev}`
+            `  Current commit:  ${newRev}`,
         );
       }
 
@@ -730,6 +744,7 @@ export class Ext extends BaseExt<Params> {
             args.denops,
             args.extParams,
             latestRollbacks,
+            checkHistories,
             plugin,
             oldRevDate,
             newRevDate,
@@ -787,16 +802,20 @@ export class Ext extends BaseExt<Params> {
       `Start: ${new Date()}`,
     );
 
-    const latestRollbacks = await loadRollbackFile(args.denops, "latest");
+    const latestRollbacks = await loadRollbacks(args.denops, "latest");
+    const checkHistories = await loadCheckHistories(args.denops);
 
     const updatedPlugins: UpdatedPlugin[] = [];
+    const checkedPlugins: UpdatedPlugin[] = [];
     const sem = new Semaphore(args.extParams.maxProcesses);
     await Promise.all(plugins.map((plugin, index) =>
       sem.lock(async () => {
         await this.#checkRemotePlugin(
           args,
           updatedPlugins,
+          checkedPlugins,
           latestRollbacks,
+          checkHistories,
           plugins.length,
           plugin,
           index + 1,
@@ -815,6 +834,8 @@ export class Ext extends BaseExt<Params> {
         updatedPlugins,
       );
     }
+
+    await saveCheckHistories(args.denops, checkedPlugins);
 
     await args.denops.call("dpp#ext#installer#_close_progress_window");
 
@@ -841,7 +862,9 @@ export class Ext extends BaseExt<Params> {
       actionParams: BaseParams;
     },
     updatedPlugins: UpdatedPlugin[],
+    checkedPlugins: UpdatedPlugin[],
     latestRollbacks: Rollbacks,
+    checkHistories: CheckHistories,
     maxLength: number,
     plugin: Plugin,
     index: number,
@@ -936,21 +959,7 @@ export class Ext extends BaseExt<Params> {
         }),
       ]);
 
-      if (
-        await checkCommitDays(
-          args.denops,
-          args.extParams,
-          latestRollbacks,
-          plugin,
-          oldRevDate,
-          newRevDate,
-        )
-      ) {
-        // Skip
-        return;
-      }
-
-      updatedPlugins.push({
+      const updated = {
         plugin,
         protocol,
         oldRev,
@@ -960,7 +969,26 @@ export class Ext extends BaseExt<Params> {
         url,
         logMessage: logMessage.join("\n"),
         changesCount: logMessage.length,
-      });
+      };
+
+      checkedPlugins.push(updated);
+
+      if (
+        await checkCommitDays(
+          args.denops,
+          args.extParams,
+          latestRollbacks,
+          checkHistories,
+          plugin,
+          oldRevDate,
+          newRevDate,
+        )
+      ) {
+        // Skip
+        return;
+      }
+
+      updatedPlugins.push(updated);
     }
   }
 
@@ -1545,27 +1573,27 @@ async function saveRollbackFile(
   const basePath = await denops.call("dpp#util#_get_base_path");
   const name = await denops.call("dpp#util#_get_name");
   for (const date of ["latest", getFormattedDate(new Date())]) {
-    const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
-    await Deno.mkdir(rollbackDir, { recursive: true });
-    const rollbackFile = `${rollbackDir}/rollback.json`;
-    await Deno.writeTextFile(rollbackFile, JSON.stringify(rollbacks));
+    const dir = `${basePath}/${name}/rollbacks/${date}`;
+    await Deno.mkdir(dir, { recursive: true });
+    const file = `${dir}/rollback.json`;
+    await Deno.writeTextFile(file, JSON.stringify(rollbacks));
   }
 }
 
-async function loadRollbackFile(
+async function loadRollbacks(
   denops: Denops,
   date: string,
 ): Promise<Rollbacks> {
   const basePath = await denops.call("dpp#util#_get_base_path");
   const name = await denops.call("dpp#util#_get_name");
-  const rollbackDir = `${basePath}/${name}/rollbacks/${date}`;
-  const rollbackFile = `${rollbackDir}/rollback.json`;
-  if (!await safeStat(rollbackFile)) {
+  const dir = `${basePath}/${name}/rollbacks/${date}`;
+  const file = `${dir}/rollback.json`;
+  if (!await safeStat(file)) {
     return {};
   }
 
   try {
-    return JSON.parse(await Deno.readTextFile(rollbackFile), (key, value) => {
+    return JSON.parse(await Deno.readTextFile(file), (key, value) => {
       if (key.endsWith("Date") && typeof value === "string") {
         return new Date(value);
       }
@@ -1574,7 +1602,63 @@ async function loadRollbackFile(
   } catch (e) {
     await printError(
       denops,
-      `Failed to parse rollback file: ${rollbackFile}: ${
+      `Failed to parse rollback file: ${file}: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    );
+    return {};
+  }
+}
+
+async function saveCheckHistories(
+  denops: Denops,
+  checkedPlugins: UpdatedPlugin[],
+) {
+  const checkHistories: CheckHistories = {};
+  const checkDate = new Date();
+  for (const checked of checkedPlugins) {
+    checkHistories[checked.plugin.name] = {
+      name: checked.plugin.name,
+      checkDate,
+      newRev: checked.newRev,
+      oldRev: checked.oldRev,
+      newRevDate: checked.newRevDate,
+      oldRevDate: checked.oldRevDate,
+      histories: [], // TODO
+    };
+  }
+
+  // Save "check_history.json" file
+  const basePath = await denops.call("dpp#util#_get_base_path");
+  const name = await denops.call("dpp#util#_get_name");
+  const dir = `${basePath}/${name}`;
+  await Deno.mkdir(dir, { recursive: true });
+  const file = `${dir}/check_history.json`;
+  await Deno.writeTextFile(file, JSON.stringify(checkHistories));
+}
+
+async function loadCheckHistories(
+  denops: Denops,
+): Promise<CheckHistories> {
+  const basePath = await denops.call("dpp#util#_get_base_path");
+  const name = await denops.call("dpp#util#_get_name");
+  const dir = `${basePath}/${name}`;
+  const file = `${dir}/check_history.json`;
+  if (!await safeStat(file)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(await Deno.readTextFile(file), (key, value) => {
+      if (key.endsWith("Date") && typeof value === "string") {
+        return new Date(value);
+      }
+      return value;
+    }) as CheckHistories;
+  } catch (e) {
+    await printError(
+      denops,
+      `Failed to parse rollback file: ${file}: ${
         e instanceof Error ? e.message : String(e)
       }`,
     );
@@ -1616,6 +1700,7 @@ async function checkCommitDays(
   denops: Denops,
   extParams: Params,
   latestRollbacks: Rollbacks,
+  checkHistories: CheckHistories,
   plugin: Plugin,
   oldRevDate: Date | null,
   newRevDate: Date | null,
@@ -1639,25 +1724,39 @@ async function checkCommitDays(
       denops,
       `${plugin.name}: update is invalid!\n` +
         `  Current day:     ${formatDate(current)}\n` +
-        `  Previous commit: ${formatDate(oldRevDate)}\n` +
-        `  Current commit:  ${formatDate(newRevDate)}\n` +
+        `  Current commit:  ${formatDate(oldRevDate)}\n` +
+        `  New commit:      ${formatDate(newRevDate)}\n` +
         `  Days since last commit: ${diff} (minimum required: ${minDays})`,
     );
     return true;
   }
 
   const rollback = latestRollbacks[plugin.name];
-  // Check the last update date.
   if (rollback?.updateDate && rollback.updateDate > newRevDate) {
     await printError(
       denops,
       `${plugin.name}: older commit is detected!\n` +
-        `  The last update: ${rollback.updateDate}\n` +
-        `  Previous commit: ${formatDate(oldRevDate)}\n` +
-        `  Current commit:  ${formatDate(newRevDate)}\n`,
+        `  The last update: ${formatDate(rollback.updateDate)}\n` +
+        `  Current commit:  ${formatDate(oldRevDate)}\n` +
+        `  New commit:      ${formatDate(newRevDate)}\n`,
       "You should check the commit.",
     );
   }
+
+  const checkHistory = checkHistories[plugin.name];
+  if (checkHistory?.newRevDate && checkHistory.newRevDate > newRevDate) {
+    await printError(
+      denops,
+      `${plugin.name}: older commit is detected!\n` +
+        `  The last check: ${formatDate(checkHistory.checkDate)}\n` +
+        `  Current commit: ${formatDate(oldRevDate)}\n` +
+        `  Checked commit: ${formatDate(checkHistory.newRevDate)}\n` +
+        `  New commit:     ${formatDate(newRevDate)}\n`,
+      "You should check the commit.",
+    );
+  }
+
+  // TODO: Check the histories
 
   return false;
 }
