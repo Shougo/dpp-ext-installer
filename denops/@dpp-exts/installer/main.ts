@@ -72,6 +72,10 @@ type CheckUpdatedPlugin = {
   updated?: Date;
 };
 
+type CheckedPlugin = UpdatedPlugin & {
+  histories: string[];
+};
+
 type Rollback = {
   name: string;
   updateDate?: Date;
@@ -743,9 +747,12 @@ export class Ext extends BaseExt<Params> {
           await checkCommitDays(
             args.denops,
             args.extParams,
+            protocol,
             latestRollbacks,
             checkHistories,
             plugin,
+            oldRev,
+            newRev,
             oldRevDate,
             newRevDate,
           )
@@ -806,7 +813,7 @@ export class Ext extends BaseExt<Params> {
     const checkHistories = await loadCheckHistories(args.denops);
 
     const updatedPlugins: UpdatedPlugin[] = [];
-    const checkedPlugins: UpdatedPlugin[] = [];
+    const checkedPlugins: CheckedPlugin[] = [];
     const sem = new Semaphore(args.extParams.maxProcesses);
     await Promise.all(plugins.map((plugin, index) =>
       sem.lock(async () => {
@@ -862,7 +869,7 @@ export class Ext extends BaseExt<Params> {
       actionParams: BaseParams;
     },
     updatedPlugins: UpdatedPlugin[],
-    checkedPlugins: UpdatedPlugin[],
+    checkedPlugins: CheckedPlugin[],
     latestRollbacks: Rollbacks,
     checkHistories: CheckHistories,
     maxLength: number,
@@ -942,7 +949,7 @@ export class Ext extends BaseExt<Params> {
         return;
       }
 
-      const [oldRevDate, newRevDate] = await Promise.all([
+      const [oldRevDate, newRevDate, histories] = await Promise.all([
         protocol.protocol.getDateFromRevision({
           denops: args.denops,
           plugin,
@@ -957,6 +964,14 @@ export class Ext extends BaseExt<Params> {
           protocolParams: protocol.params,
           rev: newRev,
         }),
+        protocol.protocol.getHistories({
+          denops: args.denops,
+          plugin,
+          protocolOptions: protocol.options,
+          protocolParams: protocol.params,
+          start: newRev,
+          end: oldRev,
+        }),
       ]);
 
       const updated = {
@@ -969,6 +984,7 @@ export class Ext extends BaseExt<Params> {
         url,
         logMessage: logMessage.join("\n"),
         changesCount: logMessage.length,
+        histories,
       };
 
       checkedPlugins.push(updated);
@@ -977,9 +993,12 @@ export class Ext extends BaseExt<Params> {
         await checkCommitDays(
           args.denops,
           args.extParams,
+          protocol,
           latestRollbacks,
           checkHistories,
           plugin,
+          oldRev,
+          newRev,
           oldRevDate,
           newRevDate,
         )
@@ -1612,7 +1631,7 @@ async function loadRollbacks(
 
 async function saveCheckHistories(
   denops: Denops,
-  checkedPlugins: UpdatedPlugin[],
+  checkedPlugins: CheckedPlugin[],
 ) {
   const checkHistories: CheckHistories = {};
   const checkDate = new Date();
@@ -1624,7 +1643,7 @@ async function saveCheckHistories(
       oldRev: checked.oldRev,
       newRevDate: checked.newRevDate,
       oldRevDate: checked.oldRevDate,
-      histories: [], // TODO
+      histories: checked.histories, // TODO
     };
   }
 
@@ -1699,9 +1718,12 @@ function formatPlugin(updated: UpdatedPlugin): string {
 async function checkCommitDays(
   denops: Denops,
   extParams: Params,
+  protocol: Protocol,
   latestRollbacks: Rollbacks,
   checkHistories: CheckHistories,
   plugin: Plugin,
+  oldRev: string,
+  newRev: string,
   oldRevDate: Date | null,
   newRevDate: Date | null,
 ): Promise<boolean> {
@@ -1757,6 +1779,15 @@ async function checkCommitDays(
   }
 
   // TODO: Check the histories
+  const histories = await protocol.protocol.getHistories({
+    denops: denops,
+    plugin,
+    protocolOptions: protocol.options,
+    protocolParams: protocol.params,
+    start: newRev,
+    end: oldRev,
+  });
+  console.log(histories);
 
   return false;
 }
