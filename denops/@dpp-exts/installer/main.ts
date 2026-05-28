@@ -1778,16 +1778,44 @@ async function checkCommitDays(
     );
   }
 
-  // TODO: Check the histories
-  const histories = await protocol.protocol.getHistories({
-    denops: denops,
-    plugin,
-    protocolOptions: protocol.options,
-    protocolParams: protocol.params,
-    start: newRev,
-    end: oldRev,
-  });
-  console.log(histories);
+  const prevHistories = new Set(checkHistory?.histories ?? []);
+  if (prevHistories.size > 0) {
+    const histories = await protocol.protocol.getHistories({
+      denops: denops,
+      plugin,
+      protocolOptions: protocol.options,
+      protocolParams: protocol.params,
+      start: newRev,
+      end: oldRev,
+    });
+    const newHistories = histories.filter((history) =>
+      !prevHistories.has(history)
+    );
+    const checkDate = rollback?.updateDate ?? checkHistory?.checkDate ??
+      new Date(0);
+    for (const history of newHistories) {
+      const commitDate = await protocol.protocol.getDateFromRevision({
+        denops: denops,
+        plugin,
+        protocolOptions: protocol.options,
+        protocolParams: protocol.params,
+        rev: history,
+      });
+      if (commitDate && commitDate < checkDate) {
+        const lastUpdate = (rollback?.updateDate || checkHistory?.checkDate)
+          ? formatDate(rollback?.updateDate || checkHistory?.checkDate!)
+          : "unknown";
+        await printError(
+          denops,
+          `${plugin.name}: suspicious old commit is detected in history!\n` +
+            `  Commit: ${history}\n` +
+            `  Commit date: ${formatDate(commitDate)}\n` +
+            `  Last update/check: ${lastUpdate}\n`,
+          "You should check the commit.",
+        );
+      }
+    }
+  }
 
   return false;
 }
