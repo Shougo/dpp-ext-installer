@@ -196,6 +196,17 @@ installerBuild  (String)
 		type dictionary, but that is now deprecated.
 		Please use |dpp-plugin-option-hook_post_update| instead.
 
+                             *dpp-ext-installer-attr-installerMaxInactiveDays*
+installerMaxInactiveDays (Number)
+		Specify the maximum number of days since the previous commit
+		that is allowed when updating a plugin.
+		If the number of days between the previous commit and the new
+		commit exceeds this value, a warning will be displayed
+		indicating that the plugin has been inactive for an extended
+		period before this update.
+		If you don't specify this value,
+		|dpp-ext-installer-param-maxInactiveDays| is used.
+
                                *dpp-ext-installer-attr-installerMinCommitDays*
 installerMinCommitDays (Number)
 		Specify the minimum number of days that must have passed since
@@ -229,6 +240,13 @@ maxProcesses
 		The max number of processes used for update.
 
 		Defaults: 5
+
+                                     *dpp-ext-installer-param-maxInactiveDays*
+maxInactiveDays
+		Specify the maximum number of days since the previous commit
+		that is allowed when updating a plugin.
+
+		Defaults: 180
 
                                        *dpp-ext-installer-param-minCommitDays*
 minCommitDays

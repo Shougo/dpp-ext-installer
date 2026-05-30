@@ -33,6 +33,7 @@ import {
 export type Params = {
   checkDiff: boolean;
   logFilePath: string;
+  maxInactiveDays: number;
   maxProcesses: number;
   minCommitDays: number;
   wait: number;
@@ -41,6 +42,7 @@ export type Params = {
 export type Attrs = {
   installerBuild?: string;
   installerFrozen?: boolean;
+  installerMaxInactiveDays?: number;
   installerMinCommitDays?: number;
 };
 
@@ -396,6 +398,7 @@ export class Ext extends BaseExt<Params> {
       checkDiff: false,
       logFilePath: "",
       maxProcesses: 5,
+      maxInactiveDays: 180,
       minCommitDays: 0,
       wait: 0,
     };
@@ -1739,28 +1742,45 @@ async function checkCommitDays(
 
   const minDays = (plugin.extAttrs as Attrs)?.installerMinCommitDays ??
     extParams.minCommitDays;
+  const maxDays = (plugin.extAttrs as Attrs)?.installerMaxInactiveDays ??
+    extParams.maxInactiveDays;
   const current = new Date();
   const diff = dateDiffDays(current, newRevDate);
-  if (diff !== null && diff < minDays) {
-    await printError(
-      denops,
-      `${plugin.name}: update is invalid!\n` +
-        `  Current day:     ${formatDate(current)}\n` +
-        `  Current commit:  ${formatDate(oldRevDate)}\n` +
-        `  New commit:      ${formatDate(newRevDate)}\n` +
+  if (diff !== null) {
+    if (diff < minDays) {
+      await printError(
+        denops,
+        `${plugin.name}: update is invalid!`,
+        `  Current day:     ${formatDate(current)}`,
+        `  Current commit:  ${formatDate(oldRevDate)}`,
+        `  New commit:      ${formatDate(newRevDate)}`,
         `  Days since last commit: ${diff} (minimum required: ${minDays})`,
-    );
-    return true;
+      );
+      return true;
+    }
+
+    if (diff > maxDays) {
+      await printError(
+        denops,
+        `${plugin.name}: inactive update is detected!`,
+        `  Current day:     ${formatDate(current)}`,
+        `  Current commit:  ${formatDate(oldRevDate)}`,
+        `  New commit:      ${formatDate(newRevDate)}`,
+        `  Days since last commit: ${diff}`,
+        "This plugin had no updates for a long period before this.",
+        "You should check the commit.",
+      );
+    }
   }
 
   const rollback = latestRollbacks[plugin.name];
   if (rollback?.updateDate && rollback.updateDate > newRevDate) {
     await printError(
       denops,
-      `${plugin.name}: older commit is detected!\n` +
-        `  The last update: ${formatDate(rollback.updateDate)}\n` +
-        `  Current commit:  ${formatDate(oldRevDate)}\n` +
-        `  New commit:      ${formatDate(newRevDate)}\n`,
+      `${plugin.name}: older commit is detected!`,
+      `  The last update: ${formatDate(rollback.updateDate)}`,
+      `  Current commit:  ${formatDate(oldRevDate)}`,
+      `  New commit:      ${formatDate(newRevDate)}`,
       "You should check the commit.",
     );
   }
@@ -1769,11 +1789,11 @@ async function checkCommitDays(
   if (checkHistory?.newRevDate && checkHistory.newRevDate > newRevDate) {
     await printError(
       denops,
-      `${plugin.name}: older commit is detected!\n` +
-        `  The last check: ${formatDate(checkHistory.checkDate)}\n` +
-        `  Current commit: ${formatDate(oldRevDate)}\n` +
-        `  Checked commit: ${formatDate(checkHistory.newRevDate)}\n` +
-        `  New commit:     ${formatDate(newRevDate)}\n`,
+      `${plugin.name}: older commit is detected!`,
+      `  The last check: ${formatDate(checkHistory.checkDate)}`,
+      `  Current commit: ${formatDate(oldRevDate)}`,
+      `  Checked commit: ${formatDate(checkHistory.newRevDate)}`,
+      `  New commit:     ${formatDate(newRevDate)}`,
       "You should check the commit.",
     );
   }
@@ -1807,10 +1827,10 @@ async function checkCommitDays(
           : "unknown";
         await printError(
           denops,
-          `${plugin.name}: suspicious old commit is detected in history!\n` +
-            `  Commit: ${history}\n` +
-            `  Commit date: ${formatDate(commitDate)}\n` +
-            `  Last update/check: ${lastUpdate}\n`,
+          `${plugin.name}: suspicious old commit is detected in history!`,
+          `  Commit: ${history}`,
+          `  Commit date: ${formatDate(commitDate)}`,
+          `  Last update/check: ${lastUpdate}`,
           "You should check the commit.",
         );
       }
