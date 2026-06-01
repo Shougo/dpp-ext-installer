@@ -224,10 +224,22 @@ PARAMS                                              *dpp-ext-installer-params*
 
                                            *dpp-ext-installer-param-checkDiff*
 checkDiff
-		It checks plugins documentation diff when updated plugins.
+		It outputs plugins documentation diff when updated plugins.
 		NOTE: It outputs the diff to new buffer in the background.
 
 		Defaults: v:false
+
+                                           *dpp-ext-installer-param-checkExts*
+checkExts
+		It specifies the list of file extensions to monitor in plugin
+		documentation diffs when a plugin is updated.
+
+		If a new direct link to a file with any of these extensions
+		(e.g. ".zip") is added to documentation such as the README,
+		the update is flagged as suspicious and a warning will be
+		displayed.
+
+		Defaults: ["zip"]
 
                                          *dpp-ext-installer-param-logFilePath*
 logFilePath

@@ -32,6 +32,7 @@ import {
 
 export type Params = {
   checkDiff: boolean;
+  checkExts: string[];
   logFilePath: string;
   maxInactiveDays: number;
   maxProcesses: number;
@@ -396,6 +397,7 @@ export class Ext extends BaseExt<Params> {
   override params(): Params {
     return {
       checkDiff: false,
+      checkExts: ["zip"],
       logFilePath: "",
       maxProcesses: 5,
       maxInactiveDays: 180,
@@ -499,16 +501,14 @@ export class Ext extends BaseExt<Params> {
         }
       }
 
-      if (args.extParams.checkDiff) {
-        await this.#checkDiff(
-          args.denops,
-          args.extParams,
-          updated.plugin,
-          updated.protocol,
-          updated.oldRev,
-          updated.newRev,
-        );
-      }
+      await this.#checkDiff(
+        args.denops,
+        args.extParams,
+        updated.plugin,
+        updated.protocol,
+        updated.oldRev,
+        updated.newRev,
+      );
     }
 
     if (updatedPlugins.length > 0) {
@@ -1271,6 +1271,7 @@ export class Ext extends BaseExt<Params> {
 
     for (const command of commands) {
       const output: string[] = [];
+
       await this.#runCommand(
         denops,
         extParams,
@@ -1280,7 +1281,33 @@ export class Ext extends BaseExt<Params> {
           if (msg) output.push(msg);
         },
       );
-      await outputCheckDiff(denops, output);
+
+      const extsPattern = extParams.checkExts.join("|").replace(
+        /\./g,
+        "\\.",
+      );
+      const regex = new RegExp(
+        `https?:\\/\\/[^\\s"]+\\.(${extsPattern})(\\b|\\?|#|\\")`,
+        "i",
+      );
+      for (const line of output) {
+        if (line.startsWith("+")) {
+          const m = line.match(regex);
+          if (m) {
+            await printError(
+              denops,
+              `${plugin.name}: A new direct link to a .${m[1]} ` +
+                "file has been added to the README.",
+              "This could indicate a potential account takeover " +
+                "or suspicious distribution. Please review carefully.",
+            );
+          }
+        }
+      }
+
+      if (extParams.checkDiff) {
+        await outputCheckDiff(denops, output);
+      }
     }
   }
 
