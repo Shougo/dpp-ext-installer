@@ -644,7 +644,8 @@ export class Ext extends BaseExt<Params> {
     }
 
     // Execute commands
-    let updateSuccess = false;
+    let updateSuccess = commands.length !== 0;
+
     for (const command of commands) {
       const { success, code } = await this.#runCommand(
         args.denops,
@@ -653,13 +654,13 @@ export class Ext extends BaseExt<Params> {
         command,
         this.#printProgress.bind(this, args.denops, args.extParams),
       );
-      if (success) {
+      if (!success) {
         await this.#printError(
           args.denops,
           args.extParams,
           `Command failed with exit code ${code}: ${command.command}`,
         );
-        updateSuccess = true;
+        updateSuccess = false;
         break;
       }
     }
