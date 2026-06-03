@@ -683,13 +683,22 @@ export class Ext extends BaseExt<Params> {
         protocolParams: protocol.params,
       });
 
-      if (newRev.length !== 0 && newRev === oldRev) {
-        await this.#printMessage(
-          args.denops,
-          args.extParams,
-          `${plugin.name}: revision is unchanged.\n` +
-            `  Current commit:  ${newRev}`,
-        );
+      if (newRev.length > 0) {
+        if (plugin.rev && plugin.rev !== newRev) {
+          await this.#printMessage(
+            args.denops,
+            args.extParams,
+            `${plugin.name}: revision is changed.\n` +
+              `  Current commit:  ${newRev}`,
+          );
+        } else if (newRev === oldRev) {
+          await this.#printMessage(
+            args.denops,
+            args.extParams,
+            `${plugin.name}: revision is unchanged.\n` +
+              `  Current commit:  ${newRev}`,
+          );
+        }
       }
 
       const logMessage = await this.#getLogMessage(
