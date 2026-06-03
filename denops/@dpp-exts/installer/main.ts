@@ -731,6 +731,21 @@ export class Ext extends BaseExt<Params> {
 
         await this.#buildPlugin(args.denops, args.extParams, plugin);
 
+        const installedOk = await checkInstalledFiles(
+          args.extParams,
+          plugin,
+        );
+
+        if (!installedOk) {
+          await this.#printError(
+            args.denops,
+            args.extParams,
+            `${plugin.name}: installed files check failed.`,
+          );
+          failedPlugins.push(plugin);
+          return;
+        }
+
         const url = await protocol.protocol.getUrl({
           denops: args.denops,
           plugin,
@@ -1875,4 +1890,50 @@ async function checkCommitDays(
   }
 
   return false;
+}
+
+async function checkInstalledFiles(
+  extParams: Params,
+  plugin: Plugin,
+): Promise<boolean> {
+  if (!plugin.path) {
+    return false;
+  }
+
+  const readmePaths = [
+    `${plugin.path}/README`,
+    `${plugin.path}/README.md`,
+    `${plugin.path}/README.rst`,
+    `${plugin.path}/README.txt`,
+  ];
+
+  let readmePath = "";
+  for (const path of readmePaths) {
+    if (await safeStat(path)) {
+      readmePath = path;
+      break;
+    }
+  }
+
+  if (readmePath.length === 0) {
+    return false;
+  }
+
+  const content = await Deno.readTextFile(readmePath);
+
+  const checkExts = (
+    (extParams as { checkExts?: string[] }).checkExts ?? []
+  ).filter((val) => val.length > 0);
+
+  if (checkExts.length === 0) {
+    return true;
+  }
+
+  const extsPattern = checkExts.join("|").replace(/\./g, "\\.");
+  const regex = new RegExp(
+    `https?:\\/\\/[^\\s"]+\\.(${extsPattern})(\\b|\\?|#|\\")`,
+    "i",
+  );
+
+  return regex.test(content);
 }
