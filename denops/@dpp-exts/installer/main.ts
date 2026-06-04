@@ -691,7 +691,9 @@ export class Ext extends BaseExt<Params> {
             `${plugin.name}: revision is changed.\n` +
               `  Current commit:  ${newRev}`,
           );
-        } else if (newRev === oldRev) {
+        }
+
+        if (!plugin.rev && newRev === oldRev) {
           await this.#printMessage(
             args.denops,
             args.extParams,
