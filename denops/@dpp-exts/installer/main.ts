@@ -1918,7 +1918,7 @@ async function checkInstalledFiles(
   }
 
   if (readmePath.length === 0) {
-    return false;
+    return true;
   }
 
   const content = await Deno.readTextFile(readmePath);
