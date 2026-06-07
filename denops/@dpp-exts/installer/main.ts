@@ -733,17 +733,26 @@ export class Ext extends BaseExt<Params> {
 
         await this.#buildPlugin(args.denops, args.extParams, plugin);
 
-        const installedOk = await checkInstalledFiles(
+        const installedResult = await checkInstalledFiles(
           args.extParams,
           plugin,
         );
 
-        if (!installedOk) {
+        if (!installedResult.ok) {
+          const detail = installedResult.readmePath.length > 0
+            ? installedResult.matchedUrls.length > 0
+              ? `readme=${installedResult.readmePath}, matches=${
+                installedResult.matchedUrls.join(", ")
+              }`
+              : `readme=${installedResult.readmePath}, no matching URLs`
+            : "no README found";
+
           await this.#printError(
             args.denops,
             args.extParams,
-            `${plugin.name}: installed files check failed.`,
+            `${plugin.name}: installed files check failed: ${detail}`,
           );
+
           failedPlugins.push(plugin);
           return;
         }
@@ -1894,12 +1903,21 @@ async function checkCommitDays(
   return false;
 }
 
+type InstalledFilesCheckResult =
+  | { ok: true }
+  | {
+    ok: false;
+    readmePath: string;
+    matchedUrls: string[];
+    checkExts: string[];
+  };
+
 async function checkInstalledFiles(
   extParams: Params,
   plugin: Plugin,
-): Promise<boolean> {
+): Promise<InstalledFilesCheckResult> {
   if (!plugin.path) {
-    return false;
+    return { ok: false, readmePath: "", matchedUrls: [], checkExts: [] };
   }
 
   const readmePaths = [
@@ -1918,24 +1936,37 @@ async function checkInstalledFiles(
   }
 
   if (readmePath.length === 0) {
-    return true;
+    return { ok: true };
   }
 
   const content = await Deno.readTextFile(readmePath);
 
   const checkExts = (
-    (extParams as { checkExts?: string[] }).checkExts ?? []
-  ).filter((val) => val.length > 0);
+    extParams as { checkExts?: string[] }
+  ).checkExts?.filter((val) => val.length > 0) ?? [];
 
   if (checkExts.length === 0) {
-    return true;
+    return { ok: true };
   }
 
-  const extsPattern = checkExts.join("|").replace(/\./g, "\\.");
+  const extsPattern = checkExts.map((ext) => ext.replace(/\./g, "\\.")).join(
+    "|",
+  );
   const regex = new RegExp(
-    `https?:\\/\\/[^\\s"]+\\.(${extsPattern})(\\b|\\?|#|\\")`,
-    "i",
+    `https?:\\/\\/[^\\s"]+\\.(${extsPattern})(\\b|\\?|#|")`,
+    "gi",
   );
 
-  return regex.test(content);
+  const matchedUrls = [...content.matchAll(regex)].map((m) => m[0]);
+
+  if (matchedUrls.length === 0) {
+    return {
+      ok: false,
+      readmePath,
+      matchedUrls: [],
+      checkExts,
+    };
+  }
+
+  return { ok: true };
 }
