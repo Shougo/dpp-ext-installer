@@ -733,26 +733,18 @@ export class Ext extends BaseExt<Params> {
 
         await this.#buildPlugin(args.denops, args.extParams, plugin);
 
-        const installedResult = await checkInstalledFiles(
-          args.extParams,
-          plugin,
-        );
-
-        if (!installedResult.ok) {
-          const detail = installedResult.readmePath.length > 0
-            ? installedResult.matchedUrls.length > 0
-              ? `readme=${installedResult.readmePath}, matches=${
-                installedResult.matchedUrls.join(", ")
-              }`
-              : `readme=${installedResult.readmePath}, no matching URLs`
-            : "no README found";
+        const matches = await checkInstalledFiles(args.extParams, plugin);
+        if (matches.length > 0) {
+          const details = matches
+            .slice(0, 5)
+            .map((m) => `${m.line}:${m.column} ${m.url}`)
+            .join("\n");
 
           await this.#printError(
             args.denops,
             args.extParams,
-            `${plugin.name}: installed files check failed: ${detail}`,
+            `${plugin.name}: installed files check failed.\n${details}`,
           );
-
           failedPlugins.push(plugin);
           return;
         }
@@ -1903,21 +1895,19 @@ async function checkCommitDays(
   return false;
 }
 
-type InstalledFilesCheckResult =
-  | { ok: true }
-  | {
-    ok: false;
-    readmePath: string;
-    matchedUrls: string[];
-    checkExts: string[];
-  };
+type InstalledFileMatch = {
+  url: string;
+  index: number;
+  line: number;
+  column: number;
+};
 
 async function checkInstalledFiles(
   extParams: Params,
   plugin: Plugin,
-): Promise<InstalledFilesCheckResult> {
+): Promise<InstalledFileMatch[]> {
   if (!plugin.path) {
-    return { ok: false, readmePath: "", matchedUrls: [], checkExts: [] };
+    return [];
   }
 
   const readmePaths = [
@@ -1936,7 +1926,7 @@ async function checkInstalledFiles(
   }
 
   if (readmePath.length === 0) {
-    return { ok: true };
+    return [];
   }
 
   const content = await Deno.readTextFile(readmePath);
@@ -1946,27 +1936,35 @@ async function checkInstalledFiles(
   ).checkExts?.filter((val) => val.length > 0) ?? [];
 
   if (checkExts.length === 0) {
-    return { ok: true };
+    return [];
   }
 
-  const extsPattern = checkExts.map((ext) => ext.replace(/\./g, "\\.")).join(
-    "|",
-  );
+  const extsPattern = checkExts
+    .map((ext) => ext.replace(/^\./, "").replace(/\./g, "\\."))
+    .join("|");
+
   const regex = new RegExp(
     `https?:\\/\\/[^\\s"]+\\.(${extsPattern})(\\b|\\?|#|")`,
     "gi",
   );
 
-  const matchedUrls = [...content.matchAll(regex)].map((m) => m[0]);
+  const matches: InstalledFileMatch[] = [];
 
-  if (matchedUrls.length === 0) {
-    return {
-      ok: false,
-      readmePath,
-      matchedUrls: [],
-      checkExts,
-    };
+  for (const match of content.matchAll(regex)) {
+    if (match.index === undefined) continue;
+
+    const index = match.index;
+    const before = content.slice(0, index);
+    const line = before.split("\n").length;
+    const column = before.length - before.lastIndexOf("\n");
+
+    matches.push({
+      url: match[0],
+      index,
+      line,
+      column,
+    });
   }
 
-  return { ok: true };
+  return matches;
 }
