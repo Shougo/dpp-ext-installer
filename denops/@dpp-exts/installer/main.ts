@@ -1744,14 +1744,15 @@ async function loadCheckHistories(
 }
 
 function formatPlugin(updated: UpdatedPlugin): string {
-  const isSupportedHost = /^https?:\/\/(github\.com|codeberg\.org)\//.test(updated.url);
+  const isSupportedHost = /^https?:\/\/(github\.com|codeberg\.org)\//.test(
+    updated.url,
+  );
 
-  const compareLink =
-    updated.oldRev !== "" && isSupportedHost
-      ? `\n    ${
-        updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
-      }/compare/${updated.oldRev}...${updated.newRev}`
-      : "";
+  const compareLink = updated.oldRev !== "" && isSupportedHost
+    ? `\n    ${
+      updated.url.replace(/\.git$/, "").replace(/^\w+:/, "https:")
+    }/compare/${updated.oldRev}...${updated.newRev}`
+    : "";
   const changes = updated.changesCount === 0
     ? ""
     : `(${updated.changesCount} change${
