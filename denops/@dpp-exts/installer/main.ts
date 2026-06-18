@@ -20,6 +20,7 @@ import { batch } from "@denops/std/batch";
 import * as autocmd from "@denops/std/autocmd";
 import * as op from "@denops/std/option";
 import * as fn from "@denops/std/function";
+import * as vars from "@denops/std/variable";
 
 import { delay } from "@std/async/delay";
 import { Semaphore } from "@core/asyncutil/semaphore";
@@ -789,19 +790,20 @@ export class Ext extends BaseExt<Params> {
           )
         ) {
           failedPlugins.push(plugin);
-        } else {
-          updatedPlugins.push({
-            plugin,
-            protocol,
-            oldRev,
-            newRev,
-            oldRevDate,
-            newRevDate,
-            url,
-            logMessage,
-            changesCount,
-          });
+          return;
         }
+
+        updatedPlugins.push({
+          plugin,
+          protocol,
+          oldRev,
+          newRev,
+          oldRevDate,
+          newRevDate,
+          url,
+          logMessage,
+          changesCount,
+        });
       }
     } else {
       failedPlugins.push(plugin);
@@ -1019,6 +1021,29 @@ export class Ext extends BaseExt<Params> {
       };
 
       checkedPlugins.push(updated);
+
+      if (plugin.hook_post_check_update) {
+        await args.denops.call(
+          "dpp#ext#installer#_call_hook",
+          "post_check_update",
+          plugin,
+          {
+            plugin,
+            oldRev,
+            newRev,
+          },
+        );
+
+        const hookResult = await vars.g.get(
+          args.denops,
+          "dpp#hook_result",
+          null,
+        );
+        if (hookResult) {
+          // Skip
+          return;
+        }
+      }
 
       if (
         await checkCommitDays(

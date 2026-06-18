@@ -89,13 +89,13 @@ function s:new_progress_window() abort
   return winid
 endfunction
 
-function dpp#ext#installer#_call_hook(hook_name, plugin) abort
+function dpp#ext#installer#_call_hook(hook_name, plugin, args = {}) abort
   call dpp#source(a:plugin.name)
 
   const cwd = getcwd()
   try
     call s:cd(a:plugin.path)
-    call dpp#util#_call_hook(a:hook_name, a:plugin.name)
+    call dpp#util#_call_hook(a:hook_name, a:plugin.name, a:args)
   finally
     call s:cd(cwd)
   endtry
