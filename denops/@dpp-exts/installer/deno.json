@@ -9,6 +9,7 @@
     ]
   },
   "imports": {
+    "@b-fuze/deno-dom": "jsr:@b-fuze/deno-dom",
     "@core/asyncutil": "jsr:@core/asyncutil@~1.2.0",
     "@denops/std": "jsr:@denops/std@~8.2.0",
     "@shougo/dpp-vim": "jsr:@shougo/dpp-vim@~6.6.0",
