@@ -2032,12 +2032,12 @@ function githubUrlToTrustUrl(url: string): string {
     throw new Error("GitHub URL only");
   }
 
-  const [owner, repo] = u.pathname.split("/").filter(Boolean);
-
-  if (!owner || !repo) {
+  const parts = u.pathname.split("/").filter(Boolean);
+  if (parts.length < 2) {
     throw new Error("Invalid GitHub repository URL");
   }
 
+  const [owner, repo] = parts;
   return `https://commit-backend.fly.dev/trust/github_repo/${owner}/${repo}`;
 }
 
