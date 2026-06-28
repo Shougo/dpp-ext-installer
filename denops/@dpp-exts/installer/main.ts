@@ -1975,7 +1975,8 @@ async function checkInstalledFiles(
 
   let readmePath = "";
   for (const path of readmePaths) {
-    if ((await safeStat(path))?.isFile) {
+    const stat = await safeStat(path);
+    if (stat?.isFile) {
       readmePath = path;
       break;
     }
