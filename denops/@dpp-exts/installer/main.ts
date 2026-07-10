@@ -303,7 +303,9 @@ export class Ext extends BaseExt<Params> {
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
-        const plugins = await getPlugins(args.denops, params.names ?? []);
+        const names = params.names ?? [];
+        const allPlugins = names.length === 0;
+        const plugins = await getPlugins(args.denops, names);
 
         const bits = await Promise.all(
           plugins.map(async (plugin) =>
@@ -319,6 +321,7 @@ export class Ext extends BaseExt<Params> {
           args,
           plugins.filter((_, i) => bits[i]),
           rollbacks,
+          allPlugins,
         );
       },
     },
@@ -342,7 +345,9 @@ export class Ext extends BaseExt<Params> {
           return;
         }
 
-        const plugins = await getPlugins(args.denops, params.names ?? []);
+        const names = params.names ?? [];
+        const allPlugins = names.length === 0;
+        const plugins = await getPlugins(args.denops, names);
 
         const rollbacks = params.rollback
           ? await loadRollbacks(args.denops, params.rollback)
@@ -365,7 +370,12 @@ export class Ext extends BaseExt<Params> {
           }
         }));
 
-        await this.#updatePlugins(args, plugins, rollbacks);
+        await this.#updatePlugins(
+          args,
+          plugins,
+          rollbacks,
+          allPlugins,
+        );
       },
     },
     update: {
@@ -378,7 +388,9 @@ export class Ext extends BaseExt<Params> {
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as InstallParams;
-        const plugins = await getPlugins(args.denops, params.names ?? []);
+        const names = params.names ?? [];
+        const allPlugins = names.length === 0;
+        const plugins = await getPlugins(args.denops, names);
 
         const rollbacks = params.rollback
           ? await loadRollbacks(args.denops, params.rollback)
@@ -392,6 +404,7 @@ export class Ext extends BaseExt<Params> {
           args,
           updatePlugins,
           rollbacks,
+          allPlugins,
         );
       },
     },
@@ -420,6 +433,7 @@ export class Ext extends BaseExt<Params> {
     },
     plugins: Plugin[],
     rollbacks: Rollbacks,
+    allPlugins: boolean,
   ) {
     this.#failedPlugins = [];
     this.#logs = [];
@@ -468,6 +482,7 @@ export class Ext extends BaseExt<Params> {
           rollbacks,
           checkHistories,
           plugins.length,
+          allPlugins,
           plugin,
           index + 1,
         );
@@ -570,6 +585,7 @@ export class Ext extends BaseExt<Params> {
     rollbacks: Rollbacks,
     checkHistories: CheckHistories,
     maxLength: number,
+    allPlugins: boolean,
     plugin: Plugin,
     index: number,
   ) {
@@ -697,7 +713,7 @@ export class Ext extends BaseExt<Params> {
           );
         }
 
-        if (!plugin.rev && newRev === oldRev) {
+        if (!allPlugins && !plugin.rev && newRev === oldRev) {
           await this.#printMessage(
             args.denops,
             args.extParams,
@@ -1136,7 +1152,7 @@ export class Ext extends BaseExt<Params> {
       args.denops,
       updatedPlugins.map((updated) => updated.plugin.name),
     );
-    await this.#updatePlugins(args, plugins, {});
+    await this.#updatePlugins(args, plugins, {}, false);
   }
 
   async #getLogMessage(
