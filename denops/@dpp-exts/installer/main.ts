@@ -21,7 +21,6 @@ import * as autocmd from "@denops/std/autocmd";
 import * as op from "@denops/std/option";
 import * as fn from "@denops/std/function";
 import * as vars from "@denops/std/variable";
-import { DOMParser } from "@b-fuze/deno-dom";
 
 import { delay } from "@std/async/delay";
 import { Semaphore } from "@core/asyncutil/semaphore";
@@ -39,7 +38,6 @@ export type Params = {
   maxInactiveDays: number;
   maxProcesses: number;
   minCommitDays: number;
-  minTrustScore: number;
   wait: number;
 };
 
@@ -418,7 +416,6 @@ export class Ext extends BaseExt<Params> {
       maxProcesses: 5,
       maxInactiveDays: 180,
       minCommitDays: 0,
-      minTrustScore: 0,
       wait: 0,
     };
   }
@@ -1939,31 +1936,6 @@ async function checkPluginCommits(
     }
   }
 
-  if (plugin.url && extParams.minTrustScore > 0) {
-    try {
-      const trustUrl = githubUrlToTrustUrl(plugin.url);
-      const trustScore = await fetchTrustScore(trustUrl);
-
-      if (trustScore < extParams.minTrustScore) {
-        await printError(
-          denops,
-          `${plugin.name}: the repository trust score is too low!`,
-          `  Score: ${trustScore}`,
-          `  minTrustScore: ${extParams.minTrustScore}`,
-          `  URL: ${trustUrl}`,
-          "You should check the repository.",
-        );
-      }
-    } catch (err) {
-      await printError(
-        denops,
-        `${plugin.name}: failed to check repository trust score.`,
-        `  URL: ${plugin.url}`,
-        `  Error: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
-
   return false;
 }
 
@@ -2040,39 +2012,4 @@ async function checkInstalledFiles(
   }
 
   return matches;
-}
-
-function githubUrlToTrustUrl(url: string): string {
-  const u = new URL(url);
-
-  if (u.hostname !== "github.com") {
-    throw new Error("GitHub URL only");
-  }
-
-  const parts = u.pathname.split("/").filter(Boolean);
-  if (parts.length < 2) {
-    throw new Error("Invalid GitHub repository URL");
-  }
-
-  const [owner, repo] = parts;
-  return `https://commit-backend.fly.dev/trust/github_repo/${owner}/${repo}`;
-}
-
-async function fetchTrustScore(url: string): Promise<number> {
-  const res = await fetch(url);
-  const html = await res.text();
-
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  if (!doc) throw new Error("Failed to parse HTML");
-
-  const direct = doc.querySelector(".score-number")?.textContent?.trim();
-  if (direct && /^\d+$/.test(direct)) return Number(direct);
-
-  const meta =
-    doc.querySelector('meta[name="description"]')?.getAttribute("content") ??
-      "";
-  const m = meta.match(/Commit Score for .*?:\s*(\d+)/);
-  if (m) return Number(m[1]);
-
-  throw new Error("Trust score not found");
 }

@@ -283,16 +283,6 @@ minCommitDays
 
 		Defaults: 0
 
-                                       *dpp-ext-installer-param-minTrustScore*
-minTrustScore
-		Specify the minimum score of the repository.
-		NOTE: It uses
-		"https://commit-backend.fly.dev/trust/github_repo/" API to
-		check.
-		NOTE: It is for github plugins only.
-
-		Defaults: 0
-
                                                 *dpp-ext-installer-param-wait*
 wait
 		The wait time(ms) after one plugin update.
