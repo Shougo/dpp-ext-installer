@@ -1,19 +1,37 @@
-function dpp#ext#installer#_print_message(msg) abort
-  const detect_shell = s:is_headless_mode()
-
-  for mes in s:msg2list(a:msg)
-    echomsg '[dpp] ' .. mes
-
-    if has('nvim') && detect_shell
-      " When it is executed from shell, new line is not added in ":echomsg".
-      echo "\n"
-    endif
-  endfor
-
-  if !has('nvim') && detect_shell
-    " When it is executed from shell, new line is not added in ":echomsg".
-    echo ""
+function dpp#ext#installer#_print_progress_message(msg) abort
+  if s:is_headless_mode()
+    return dpp#ext#installer#_print_message(a:msg)
   endif
+
+  const winid = s:get_progress_winid()
+  if winid <= 0
+    return
+  endif
+
+  call s:append_progress_message(winid, a:msg)
+endfunction
+function s:get_progress_winid() abort
+  if !exists('s:progress_winid') || s:progress_winid <= 0
+    let s:progress_winid = s:new_progress_window()
+  endif
+
+  return s:progress_winid
+endfunction
+function s:append_progress_message(winid, msg) abort
+  const bufnr = a:winid->winbufnr()
+
+  if bufnr <= 0
+    return
+  endif
+
+  const first_line = bufnr->getbufline(1)
+  if first_line ==# ['']
+    call setbufline(bufnr, 1, a:msg)
+  else
+    call appendbufline(bufnr, '$', a:msg)
+  endif
+
+  call win_execute(a:winid, "call cursor('$', 0) | redraw")
 endfunction
 function s:msg2list(expr) abort
   return a:expr->type() ==# v:t_list ? a:expr : a:expr->split('\n')
@@ -94,14 +112,14 @@ function dpp#ext#installer#_call_hook(hook_name, plugin, args = {}) abort
 
   const cwd = getcwd()
   try
-    call s:cd(a:plugin.path)
+    call s:change_directory(a:plugin.path)
     call dpp#util#_call_hook(a:hook_name, a:plugin.name, a:args)
   finally
-    call s:cd(cwd)
+    call s:change_directory(cwd)
   endtry
 endfunction
 
-function! s:cd(path) abort
+function s:change_directory(path) abort
   if !(a:path->isdirectory())
     return
   endif
