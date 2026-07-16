@@ -1,3 +1,20 @@
+function dpp#ext#installer#_print_message(msg) abort
+  const detect_shell = s:is_headless_mode()
+
+  for mes in s:msg2list(a:msg)
+    echomsg '[dpp] ' .. mes
+
+    if has('nvim') && detect_shell
+      " When it is executed from shell, new line is not added in ":echomsg".
+      echo "\n"
+    endif
+  endfor
+
+  if !has('nvim') && detect_shell
+    " When it is executed from shell, new line is not added in ":echomsg".
+    echo ""
+  endif
+endfunction
 function dpp#ext#installer#_print_progress_message(msg) abort
   if s:is_headless_mode()
     return dpp#ext#installer#_print_message(a:msg)
@@ -35,25 +52,6 @@ function s:append_progress_message(winid, msg) abort
 endfunction
 function s:msg2list(expr) abort
   return a:expr->type() ==# v:t_list ? a:expr : a:expr->split('\n')
-endfunction
-
-function dpp#ext#installer#_print_progress_message(msg) abort
-  if s:is_headless_mode()
-    " Don't create window for headless mode
-    return dpp#ext#installer#_print_message(a:msg)
-  endif
-
-  if !exists('s:progress_winid') || s:progress_winid <= 0
-    let s:progress_winid = s:new_progress_window()
-  endif
-
-  const bufnr = s:progress_winid->winbufnr()
-  if bufnr->getbufline(1) ==# ['']
-    call setbufline(bufnr, 1, a:msg)
-  else
-    call appendbufline(bufnr, '$', a:msg)
-  endif
-  call win_execute(s:progress_winid, "call cursor('$', 0) | redraw")
 endfunction
 
 function! s:is_headless_mode() abort

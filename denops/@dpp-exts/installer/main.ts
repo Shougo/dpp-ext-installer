@@ -432,140 +432,28 @@ export class Ext extends BaseExt<Params> {
     rollbacks: Rollbacks,
     allPlugins: boolean,
   ) {
-    this.#failedPlugins = [];
-    this.#logs = [];
-    this.#updatedPlugins = [];
-    this.#updateLogs = [];
+    this.#resetUpdateState();
 
     if (plugins.length === 0) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "Target plugins are not found.",
-      );
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "You may have used the wrong plugin name," +
-          " or all of the plugins are already installed.",
-      );
-
-      await args.denops.cmd(
-        "doautocmd User Dpp:ext:installer:updateDone",
-      );
-
+      await this.#handleNoTargetPlugins(args);
       return;
     }
 
-    await this.#printMessage(
-      args.denops,
-      args.extParams,
-      `Start: ${new Date()}`,
-    );
+    await this.#printUpdateStart(args);
 
     const latestRollbacks = await loadRollbacks(args.denops, "latest");
     const checkHistories = await loadCheckHistories(args.denops);
 
-    const updatedPlugins: UpdatedPlugin[] = [];
-    const failedPlugins: Plugin[] = [];
-    const sem = new Semaphore(args.extParams.maxProcesses);
-    await Promise.all(plugins.map((plugin, index) =>
-      sem.lock(async () => {
-        await this.#updatePlugin(
-          args,
-          updatedPlugins,
-          failedPlugins,
-          latestRollbacks,
-          rollbacks,
-          checkHistories,
-          plugins.length,
-          allPlugins,
-          plugin,
-          index + 1,
-        );
-
-        if (args.extParams.wait > 0) {
-          await delay(args.extParams.wait);
-        }
-      })
-    ));
-
-    const calledDepends: Record<string, boolean> = {};
-    for (const updated of updatedPlugins) {
-      if (updated.plugin.hook_done_update) {
-        await args.denops.call(
-          "dpp#ext#installer#_call_hook",
-          "done_update",
-          updated.plugin,
-        );
-      }
-
-      for (
-        const depend of await getPlugins(
-          args.denops,
-          convert2List(updated.plugin.depends),
-        )
-      ) {
-        if (depend.hook_depends_update && !calledDepends[depend.name]) {
-          calledDepends[depend.name] = true;
-
-          await args.denops.call(
-            "dpp#ext#installer#_call_hook",
-            "depends_update",
-            depend,
-          );
-        }
-      }
-
-      await this.#checkDiff(
-        args.denops,
-        args.extParams,
-        updated.plugin,
-        updated.protocol,
-        updated.oldRev,
-        updated.newRev,
-      );
-    }
-
-    if (updatedPlugins.length > 0) {
-      await this.#printUpdatedPlugins(
-        args.denops,
-        args.extParams,
-        updatedPlugins,
-      );
-
-      await saveRollbackFile(args.denops, args.protocols, updatedPlugins);
-    }
-
-    if (failedPlugins.length > 0) {
-      await this.#printMessage(
-        args.denops,
-        args.extParams,
-        "Failed plugins:\n" +
-          `${failedPlugins.map((plugin) => plugin.name).join("\n")}\n` +
-          "Please read the error message log with the :message command.",
-      );
-    }
-
-    this.#updatedPlugins = updatedPlugins.map((plugin) => plugin.plugin);
-    this.#failedPlugins = failedPlugins;
-
-    await args.denops.call("dpp#ext#installer#_close_progress_window");
-
-    await args.denops.call("dpp#make_state");
-
-    // NOTE: "redraw" is needed to close popup window
-    await args.denops.cmd("redraw");
-
-    await this.#printMessage(
-      args.denops,
-      args.extParams,
-      `Done: ${new Date()}`,
+    const { updatedPlugins, failedPlugins } = await this.#processPlugins(
+      args,
+      plugins,
+      latestRollbacks,
+      rollbacks,
+      checkHistories,
+      allPlugins,
     );
 
-    await args.denops.cmd(
-      "doautocmd User Dpp:ext:installer:updateDone",
-    );
+    await this.#finalizeUpdate(args, updatedPlugins, failedPlugins);
   }
 
   async #updatePlugin(
@@ -826,6 +714,173 @@ export class Ext extends BaseExt<Params> {
     }
   }
 
+  #resetUpdateState() {
+    this.#failedPlugins = [];
+    this.#logs = [];
+    this.#updatedPlugins = [];
+    this.#updateLogs = [];
+  }
+
+  async #handleNoTargetPlugins(args: {
+    denops: Denops;
+    extParams: Params;
+  }) {
+    await this.#printError(
+      args.denops,
+      args.extParams,
+      "Target plugins are not found.",
+    );
+    await this.#printError(
+      args.denops,
+      args.extParams,
+      "You may have used the wrong plugin name," +
+        " or all of the plugins are already installed.",
+    );
+    await args.denops.cmd("doautocmd User Dpp:ext:installer:updateDone");
+  }
+
+  async #printUpdateStart(args: {
+    denops: Denops;
+    extParams: Params;
+  }) {
+    await this.#printMessage(
+      args.denops,
+      args.extParams,
+      `Start: ${new Date()}`,
+    );
+  }
+
+  async #processPlugins(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      protocols: Record<ProtocolName, Protocol>;
+      extParams: Params;
+      actionParams: BaseParams;
+    },
+    plugins: Plugin[],
+    latestRollbacks: Rollbacks,
+    rollbacks: Rollbacks,
+    checkHistories: CheckHistories,
+    allPlugins: boolean,
+  ): Promise<{ updatedPlugins: UpdatedPlugin[]; failedPlugins: Plugin[] }> {
+    const updatedPlugins: UpdatedPlugin[] = [];
+    const failedPlugins: Plugin[] = [];
+    const sem = new Semaphore(args.extParams.maxProcesses);
+
+    await Promise.all(plugins.map((plugin, index) =>
+      sem.lock(async () => {
+        await this.#updatePlugin(
+          args,
+          updatedPlugins,
+          failedPlugins,
+          latestRollbacks,
+          rollbacks,
+          checkHistories,
+          plugins.length,
+          allPlugins,
+          plugin,
+          index + 1,
+        );
+
+        if (args.extParams.wait > 0) {
+          await delay(args.extParams.wait);
+        }
+      })
+    ));
+
+    return { updatedPlugins, failedPlugins };
+  }
+
+  async #finalizeUpdate(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      protocols: Record<ProtocolName, Protocol>;
+      extParams: Params;
+      actionParams: BaseParams;
+    },
+    updatedPlugins: UpdatedPlugin[],
+    failedPlugins: Plugin[],
+  ) {
+    const calledDepends: Record<string, boolean> = {};
+    for (const updated of updatedPlugins) {
+      if (updated.plugin.hook_done_update) {
+        await args.denops.call(
+          "dpp#ext#installer#_call_hook",
+          "done_update",
+          updated.plugin,
+        );
+      }
+
+      for (
+        const depend of await getPlugins(
+          args.denops,
+          convert2List(updated.plugin.depends),
+        )
+      ) {
+        if (depend.hook_depends_update && !calledDepends[depend.name]) {
+          calledDepends[depend.name] = true;
+
+          await args.denops.call(
+            "dpp#ext#installer#_call_hook",
+            "depends_update",
+            depend,
+          );
+        }
+      }
+
+      await this.#checkDiff(
+        args.denops,
+        args.extParams,
+        updated.plugin,
+        updated.protocol,
+        updated.oldRev,
+        updated.newRev,
+      );
+    }
+
+    if (updatedPlugins.length > 0) {
+      await this.#printUpdatedPlugins(
+        args.denops,
+        args.extParams,
+        updatedPlugins,
+      );
+
+      await saveRollbackFile(args.denops, args.protocols, updatedPlugins);
+    }
+
+    if (failedPlugins.length > 0) {
+      await this.#printMessage(
+        args.denops,
+        args.extParams,
+        "Failed plugins:\n" +
+          `${failedPlugins.map((plugin) => plugin.name).join("\n")}\n` +
+          "Please read the error message log with the :message command.",
+      );
+    }
+
+    this.#updatedPlugins = updatedPlugins.map((plugin) => plugin.plugin);
+    this.#failedPlugins = failedPlugins;
+
+    await args.denops.call("dpp#ext#installer#_close_progress_window");
+
+    await args.denops.call("dpp#make_state");
+
+    // NOTE: "redraw" is needed to close popup window
+    await args.denops.cmd("redraw");
+
+    await this.#printMessage(
+      args.denops,
+      args.extParams,
+      `Done: ${new Date()}`,
+    );
+
+    await args.denops.cmd(
+      "doautocmd User Dpp:ext:installer:updateDone",
+    );
+  }
+
   async #checkRemotePlugins(
     args: {
       denops: Denops;
@@ -837,33 +892,49 @@ export class Ext extends BaseExt<Params> {
     plugins: Plugin[],
   ): Promise<CheckUpdatedPlugin[]> {
     if (plugins.length === 0) {
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "Target plugins are not found.",
-      );
-      await this.#printError(
-        args.denops,
-        args.extParams,
-        "You may have used the wrong plugin name," +
-          " or all of the plugins are already installed.",
-      );
-
+      await this.#handleNoTargetPlugins(args);
       return [];
     }
 
-    await this.#printMessage(
-      args.denops,
-      args.extParams,
-      `Start: ${new Date()}`,
-    );
+    await this.#printUpdateStart(args);
 
     const latestRollbacks = await loadRollbacks(args.denops, "latest");
     const checkHistories = await loadCheckHistories(args.denops);
 
+    const { updatedPlugins, checkedPlugins } = await this.#processCheckPlugins(
+      args,
+      plugins,
+      latestRollbacks,
+      checkHistories,
+    );
+
+    await this.#finalizeCheck(args, updatedPlugins, checkedPlugins);
+
+    return updatedPlugins.map((plugin) => ({
+      plugin: plugin.plugin,
+      count: plugin.changesCount,
+    }));
+  }
+
+  async #processCheckPlugins(
+    args: {
+      denops: Denops;
+      options: DppOptions;
+      protocols: Record<ProtocolName, Protocol>;
+      extParams: Params;
+      actionParams: BaseParams;
+    },
+    plugins: Plugin[],
+    latestRollbacks: Rollbacks,
+    checkHistories: CheckHistories,
+  ): Promise<{
+    updatedPlugins: UpdatedPlugin[];
+    checkedPlugins: CheckedPlugin[];
+  }> {
     const updatedPlugins: UpdatedPlugin[] = [];
     const checkedPlugins: CheckedPlugin[] = [];
     const sem = new Semaphore(args.extParams.maxProcesses);
+
     await Promise.all(plugins.map((plugin, index) =>
       sem.lock(async () => {
         await this.#checkRemotePlugin(
@@ -883,6 +954,17 @@ export class Ext extends BaseExt<Params> {
       })
     ));
 
+    return { updatedPlugins, checkedPlugins };
+  }
+
+  async #finalizeCheck(
+    args: {
+      denops: Denops;
+      extParams: Params;
+    },
+    updatedPlugins: UpdatedPlugin[],
+    checkedPlugins: CheckedPlugin[],
+  ) {
     if (updatedPlugins.length > 0) {
       await this.#printUpdatedPlugins(
         args.denops,
@@ -892,21 +974,13 @@ export class Ext extends BaseExt<Params> {
     }
 
     await saveCheckHistories(args.denops, checkedPlugins);
-
     await args.denops.call("dpp#ext#installer#_close_progress_window");
-
-    // NOTE: "redraw" is needed to close popup window
     await args.denops.cmd("redraw");
-
     await this.#printMessage(
       args.denops,
       args.extParams,
       `Done: ${new Date()}`,
     );
-
-    return updatedPlugins.map((plugin) => {
-      return { plugin: plugin.plugin, count: plugin.changesCount };
-    });
   }
 
   async #checkRemotePlugin(
@@ -1833,6 +1907,39 @@ async function checkPluginCommits(
     return false;
   }
 
+  const minCheckResult = await checkCommitAge(
+    denops,
+    extParams,
+    plugin,
+    oldRevDate,
+    newRevDate,
+  );
+  if (minCheckResult) {
+    return true;
+  }
+
+  await checkRollbackAndHistoryAge(
+    denops,
+    protocol,
+    latestRollbacks,
+    checkHistories,
+    plugin,
+    oldRev,
+    newRev,
+    oldRevDate,
+    newRevDate,
+  );
+
+  return false;
+}
+
+async function checkCommitAge(
+  denops: Denops,
+  extParams: Params,
+  plugin: Plugin,
+  oldRevDate: Date,
+  newRevDate: Date,
+): Promise<boolean> {
   const pad = (n: number) => n.toString().padStart(2, "0");
   const formatDate = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${
@@ -1845,32 +1952,54 @@ async function checkPluginCommits(
     extParams.maxInactiveDays;
   const current = new Date();
   const diff = dateDiffDays(current, newRevDate);
-  if (diff !== null) {
-    if (diff < minDays) {
-      await printError(
-        denops,
-        `${plugin.name}: update is invalid!`,
-        `  Current day:     ${formatDate(current)}`,
-        `  Current commit:  ${formatDate(oldRevDate)}`,
-        `  New commit:      ${formatDate(newRevDate)}`,
-        `  Days since last commit: ${diff} (minimum required: ${minDays})`,
-      );
-      return true;
-    }
-
-    if (diff > maxDays) {
-      await printError(
-        denops,
-        `${plugin.name}: inactive update is detected!`,
-        `  Current day:     ${formatDate(current)}`,
-        `  Current commit:  ${formatDate(oldRevDate)}`,
-        `  New commit:      ${formatDate(newRevDate)}`,
-        `  Days since last commit: ${diff}`,
-        "This plugin had no updates for a long period before this.",
-        "You should check the commit.",
-      );
-    }
+  if (diff === null) {
+    return false;
   }
+
+  if (diff < minDays) {
+    await printError(
+      denops,
+      `${plugin.name}: update is invalid!`,
+      `  Current day:     ${formatDate(current)}`,
+      `  Current commit:  ${formatDate(oldRevDate)}`,
+      `  New commit:      ${formatDate(newRevDate)}`,
+      `  Days since last commit: ${diff} (minimum required: ${minDays})`,
+    );
+    return true;
+  }
+
+  if (diff > maxDays) {
+    await printError(
+      denops,
+      `${plugin.name}: inactive update is detected!`,
+      `  Current day:     ${formatDate(current)}`,
+      `  Current commit:  ${formatDate(oldRevDate)}`,
+      `  New commit:      ${formatDate(newRevDate)}`,
+      `  Days since last commit: ${diff}`,
+      "This plugin had no updates for a long period before this.",
+      "You should check the commit.",
+    );
+  }
+
+  return false;
+}
+
+async function checkRollbackAndHistoryAge(
+  denops: Denops,
+  protocol: Protocol,
+  latestRollbacks: Rollbacks,
+  checkHistories: CheckHistories,
+  plugin: Plugin,
+  oldRev: string,
+  newRev: string,
+  oldRevDate: Date,
+  newRevDate: Date,
+) {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const formatDate = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${
+      pad(d.getHours())
+    }:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
   const rollback = latestRollbacks[plugin.name];
   if (rollback?.updateDate && rollback.updateDate > newRevDate) {
@@ -1898,45 +2027,47 @@ async function checkPluginCommits(
   }
 
   const prevHistories = new Set(checkHistory?.histories ?? []);
-  if (prevHistories.size > 0) {
-    const histories = await protocol.protocol.getHistories({
-      denops: denops,
+  if (prevHistories.size === 0) {
+    return;
+  }
+
+  const histories = await protocol.protocol.getHistories({
+    denops,
+    plugin,
+    protocolOptions: protocol.options,
+    protocolParams: protocol.params,
+    start: newRev,
+    end: oldRev,
+  });
+
+  const newHistories = histories.filter((history) =>
+    !prevHistories.has(history)
+  );
+  const checkDate = rollback?.updateDate ?? checkHistory?.checkDate ??
+    new Date(0);
+
+  for (const history of newHistories) {
+    const commitDate = await protocol.protocol.getDateFromRevision({
+      denops,
       plugin,
       protocolOptions: protocol.options,
       protocolParams: protocol.params,
-      start: newRev,
-      end: oldRev,
+      rev: history,
     });
-    const newHistories = histories.filter((history) =>
-      !prevHistories.has(history)
-    );
-    const checkDate = rollback?.updateDate ?? checkHistory?.checkDate ??
-      new Date(0);
-    for (const history of newHistories) {
-      const commitDate = await protocol.protocol.getDateFromRevision({
-        denops: denops,
-        plugin,
-        protocolOptions: protocol.options,
-        protocolParams: protocol.params,
-        rev: history,
-      });
-      if (commitDate && commitDate < checkDate) {
-        const lastUpdate = (rollback?.updateDate || checkHistory?.checkDate)
-          ? formatDate(rollback?.updateDate || checkHistory?.checkDate!)
-          : "unknown";
-        await printError(
-          denops,
-          `${plugin.name}: suspicious old commit is detected in history!`,
-          `  Commit: ${history}`,
-          `  Commit date: ${formatDate(commitDate)}`,
-          `  Last update/check: ${lastUpdate}`,
-          "You should check the commit.",
-        );
-      }
+    if (commitDate && commitDate < checkDate) {
+      const lastUpdate = (rollback?.updateDate || checkHistory?.checkDate)
+        ? formatDate(rollback?.updateDate || checkHistory?.checkDate!)
+        : "unknown";
+      await printError(
+        denops,
+        `${plugin.name}: suspicious old commit is detected in history!`,
+        `  Commit: ${history}`,
+        `  Commit date: ${formatDate(commitDate)}`,
+        `  Last update/check: ${lastUpdate}`,
+        "You should check the commit.",
+      );
     }
   }
-
-  return false;
 }
 
 type InstalledFileMatch = {
