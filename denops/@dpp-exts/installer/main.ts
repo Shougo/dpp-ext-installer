@@ -650,8 +650,6 @@ export class Ext extends BaseExt<Params> {
             args.extParams,
             `${plugin.name}: installed files check failed.\n${details}`,
           );
-          failedPlugins.push(plugin);
-          return;
         }
 
         const url = await protocol.protocol.getUrl({
