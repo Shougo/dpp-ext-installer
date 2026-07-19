@@ -677,23 +677,18 @@ export class Ext extends BaseExt<Params> {
         ]);
 
         // NOTE: Print warnings if the commit days are invalid.
-        if (
-          await checkPluginCommits(
-            args.denops,
-            args.extParams,
-            protocol,
-            latestRollbacks,
-            checkHistories,
-            plugin,
-            oldRev,
-            newRev,
-            oldRevDate,
-            newRevDate,
-          )
-        ) {
-          failedPlugins.push(plugin);
-          return;
-        }
+        await checkPluginCommits(
+          args.denops,
+          args.extParams,
+          protocol,
+          latestRollbacks,
+          checkHistories,
+          plugin,
+          oldRev,
+          newRev,
+          oldRevDate,
+          newRevDate,
+        );
 
         updatedPlugins.push({
           plugin,
@@ -802,6 +797,7 @@ export class Ext extends BaseExt<Params> {
     failedPlugins: Plugin[],
   ) {
     const calledDepends: Record<string, boolean> = {};
+    let callMakeState = false;
     for (const updated of updatedPlugins) {
       if (updated.plugin.hook_done_update) {
         await args.denops.call(
@@ -828,7 +824,7 @@ export class Ext extends BaseExt<Params> {
         }
       }
 
-      await this.#checkDiff(
+      const checkDiff = await this.#checkDiff(
         args.denops,
         args.extParams,
         updated.plugin,
@@ -836,6 +832,10 @@ export class Ext extends BaseExt<Params> {
         updated.oldRev,
         updated.newRev,
       );
+
+      if (updated.plugin.merged || checkDiff) {
+        callMakeState = true;
+      }
     }
 
     if (updatedPlugins.length > 0) {
@@ -863,7 +863,10 @@ export class Ext extends BaseExt<Params> {
 
     await args.denops.call("dpp#ext#installer#_close_progress_window");
 
-    await args.denops.call("dpp#make_state");
+    if (callMakeState) {
+      // Call dpp#make_state() if merged plugins are updated.
+      await args.denops.call("dpp#make_state");
+    }
 
     // NOTE: "redraw" is needed to close popup window
     await args.denops.cmd("redraw");
@@ -1396,9 +1399,9 @@ export class Ext extends BaseExt<Params> {
     protocol: Protocol,
     oldRev: string,
     newRev: string,
-  ) {
+  ): Promise<boolean> {
     if (newRev === oldRev || newRev.length === 0 || oldRev.length === 0) {
-      return;
+      return false;
     }
 
     const commands = await protocol.protocol.getDiffCommands({
@@ -1410,6 +1413,8 @@ export class Ext extends BaseExt<Params> {
       oldRev,
     });
 
+    // NOTE: If diff commands are empty, the documentation may be updated.
+    let checkDiff = commands.length === 0;
     for (const command of commands) {
       const output: string[] = [];
 
@@ -1449,7 +1454,14 @@ export class Ext extends BaseExt<Params> {
       if (extParams.checkDiff) {
         await outputCheckDiff(denops, output);
       }
+
+      if (output.length > 0) {
+        // The documentation is updated.
+        checkDiff = true;
+      }
     }
+
+    return checkDiff;
   }
 
   async #printUpdatedPlugins(
