@@ -1413,7 +1413,6 @@ export class Ext extends BaseExt<Params> {
       oldRev,
     });
 
-    // NOTE: If diff commands are empty, the documentation may be updated.
     let checkDiff = commands.length === 0;
     for (const command of commands) {
       const output: string[] = [];
@@ -1702,7 +1701,7 @@ async function outputCheckDiff(denops: Denops, output: string[]) {
     const winId = await fn.win_getid(denops);
 
     const cmd =
-      "setlocal bufhidden=wipe filetype=diff buftype=nofile nolist | syntax enable"
+      "setlocal bufhidden=wipe filetype=diff syntax=diff buftype=nofile nolist"
         .replaceAll(" ", "\\ ");
     await denops.cmd(`sbuffer +${cmd} ${bufnr}`);
 
