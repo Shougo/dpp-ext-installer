@@ -71,8 +71,6 @@ checkNotUpdated
 denoCache
 		Execute "deno cache --reload" for plugins.
 		NOTE: "deno" command is required.
-		NOTE: It is also executed when plugins are installed/updated
-		if |dpp-ext-installer-param-enableDenoCache| is v:true.
 
 		params:
 			{names}:	Plugin names.
@@ -99,9 +97,11 @@ getNotInstalled
 
                                       *dpp-ext-installer-action-getNotUpdated*
 getNotUpdated
-		Get not updated plugins via the protocol
-		(same as |dpp-ext-installer-action-getUpdated|).
-		NOTE: It must be executed by |dpp#sync_ext_action()|.
+		Check plugins via the configured protocol and return plugins
+		which have remote updates or are not installed.
+
+		NOTE: Unlike |dpp-ext-installer-action-getUpdated|, this
+		action performs a remote check every time.
 
 		params:
 			{names}:	Plugin names.
@@ -189,21 +189,29 @@ ATTRS                                                *dpp-ext-installer-attrs*
                                        *dpp-ext-installer-attr-installerBuild*
 installerBuild  (String)
 		Specify the build script.
-		This command is executed by 'shell' from the plugin
-		runtimepath.
+		This command is executed by 'shell' with 'shellcmdflag' in the
+		plugin directory as the current working directory.
 		NOTE: It must be single command.
 		NOTE: In previous versions of dpp, build could also be of
 		type dictionary, but that is now deprecated.
 		Please use |dpp-plugin-option-hook_post_update| instead.
 
+		When |dpp-plugin-option-hook_post_update| is specified,
+		the plugin is sourced before the hook is executed if it has
+		not been sourced yet.
+
+		NOTE: This may modify the current Vim/Neovim session.
+		It may update 'runtimepath', load plugin scripts, and reload
+		filetype plugins.
+
                              *dpp-ext-installer-attr-installerMaxInactiveDays*
 installerMaxInactiveDays (Number)
 		Specify the maximum number of days since the previous commit
 		that is allowed when updating a plugin.
-		If the number of days between the previous commit and the new
-		commit exceeds this value, a warning will be displayed
-		indicating that the plugin has been inactive for an extended
-		period before this update.
+		If  the number of days since the new commitand the new commit
+		exceeds this value, a warning will be displayed indicating
+		that the plugin has been inactive for an extended period
+		before this update.
 		If you don't specify this value,
 		|dpp-ext-installer-param-maxInactiveDays| is used.
 
@@ -265,9 +273,8 @@ minCommitDays
 		Specify the minimum number of days that must have passed since
 		the previous commit in order to update a plugin.
 
-		If it is greater than 0, |dpp-ext-installer| will check the
-		days between the previous and current commit when performing
-		plugin updates.
+		If it is greater than 0, |dpp-ext-installer| checks how many
+		days have elapsed since the new revision was committed.
 
 		On |dpp-ext-installer-action-install| or
 		|dpp-ext-installer-action-update|:
@@ -277,6 +284,11 @@ minCommitDays
 		On |dpp-ext-installer-action-checkNotUpdated|:
 			If the interval is less than it, a warning is
 			displayed and the update will be **skipped**.
+
+		NOTE: For |dpp-ext-installer-action-install| and
+		|dpp-ext-installer-action-update|, this check is performed
+		after the repository operation. A failed check does not undo
+		the repository operation.
 
 		It helps you avoid updating plugins too frequently (e.g.
 		following experimental or fast-moving branches).
