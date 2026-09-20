@@ -23,8 +23,9 @@ INTRODUCTION                                  *dpp-ext-installer-introduction*
 
 This ext implements plugins installer.
 
-NOTE: It does not work for |dpp-plugin-option-frozen| and
-|dpp-plugin-option-local| plugins.
+Plugins with the local option are skipped by update operations.
+The "installerFrozen" extension attribute prevents automatic update and
+update checks.
 
 
 ==============================================================================
@@ -49,8 +50,10 @@ ACTIONS                                            *dpp-ext-installer-actions*
 
                                               *dpp-ext-installer-action-build*
 build
-		Build plugins.
-		NOTE: It is also executed when plugins are installed/updated.
+		Execute |dpp-ext-installer-attr-installerBuild| for the
+		specified plugins.
+
+		Plugins without "installerBuild" are skipped.
 
 		params:
 			{names}:	Plugin names.
@@ -224,8 +227,8 @@ installerMinCommitDays (Number)
 
                                       *dpp-ext-installer-attr-installerFrozen*
 installerFrozen (Bool)
-		If set to v:true, dpp doesn't update it automatically. It is
-		useful for outdated plugins that can no longer be updated.
+		This attribute prevents automatic update and update checks. It
+		does not prevent explicit install or reinstall actions.
 
 ------------------------------------------------------------------------------
 PARAMS                                              *dpp-ext-installer-params*
@@ -297,8 +300,9 @@ minCommitDays
 
                                                 *dpp-ext-installer-param-wait*
 wait
-		The wait time(ms) after one plugin update.
-		It is useful for restricted network environment.
+		The delay in milliseconds after each plugin processing task.
+		The delay is applied independently to concurrently processed
+		plugins.
 
 		Defaults: 0
 
@@ -309,8 +313,12 @@ dpp-ext-installer defines some |User| autocmds.
 
                       *dpp-ext-installer-autocmd-Dpp:ext:installer:updateDone*
 Dpp:ext:installer:updateDone
-		Called after updated plugins.
-		NOTE: It is called if updated plugins are empty.
+		Called when an install, reinstall, update, or
+		confirmation-driven update operation has finished or has no
+		target plugins.
+
+		It may be called even when no plugin was updated. It is not a
+		general completion event for every installer action.
 
 ==============================================================================
 ROLLBACK                                          *dpp-ext-installer-rollback*
