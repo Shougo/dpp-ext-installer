@@ -636,7 +636,15 @@ export class Ext extends BaseExt<Params> {
           );
         }
 
-        await this.#buildPlugin(args.denops, args.extParams, plugin);
+        const buildSuccess = await this.#buildPlugin(
+          args.denops,
+          args.extParams,
+          plugin,
+        );
+        if (!buildSuccess) {
+          failedPlugins.push(plugin);
+          return;
+        }
 
         const matches = await checkInstalledFiles(args.extParams, plugin);
         if (matches.length > 0) {
@@ -1303,10 +1311,10 @@ export class Ext extends BaseExt<Params> {
     denops: Denops,
     extParams: Params,
     plugin: Plugin,
-  ) {
+  ): Promise<boolean> {
     const build = (plugin.extAttrs as Attrs)?.installerBuild;
     if (!plugin.path || !await isDirectory(plugin.path) || !build) {
-      return;
+      return true;
     }
 
     const { stdout, stderr, status } = new Deno.Command(
@@ -1321,7 +1329,7 @@ export class Ext extends BaseExt<Params> {
 
     pipeStream(stdout, this.#printProgress.bind(this, denops, extParams));
     pipeStream(stderr, this.#printError.bind(this, denops, extParams));
-    await status;
+    return (await status).success;
   }
 
   async #denoCachePlugins(
