@@ -106,6 +106,13 @@ function s:new_progress_window() abort
 endfunction
 
 function dpp#ext#installer#_call_hook(hook_name, plugin, args = {}) abort
+  const hook = 'hook_' .. a:hook_name
+
+  " Check hook exists
+  if !a:plugin->has_key(hook)
+    return
+  endif
+
   call dpp#source(a:plugin.name)
 
   const cwd = getcwd()
